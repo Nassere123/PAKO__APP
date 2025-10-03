@@ -44,12 +44,12 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ navig
     setCode(updatedCode);
 
     // Auto-focus next input
-    if (value && index < 5) {
+    if (value && index < 3) {
       inputRefs.current[index + 1]?.focus();
     }
 
     // Auto-submit when all digits are entered
-    if (updatedCode.length === 6 && /^\d{6}$/.test(updatedCode)) {
+    if (updatedCode.length === 4 && /^\d{4}$/.test(updatedCode)) {
       setTimeout(() => handleVerifyCode(updatedCode), 100); // Petit délai pour l'UX
     }
   };
@@ -63,8 +63,8 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ navig
   const handleVerifyCode = async (codeToVerify?: string): Promise<void> => {
     const currentCode = codeToVerify || code;
     
-    if (currentCode.length !== 6 || !/^\d{6}$/.test(currentCode)) {
-      Alert.alert('Erreur', 'Veuillez saisir le code complet à 6 chiffres');
+    if (currentCode.length !== 4 || !/^\d{4}$/.test(currentCode)) {
+      Alert.alert('Erreur', 'Veuillez saisir le code complet à 4 chiffres');
       return;
     }
 
@@ -110,11 +110,7 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ navig
   };
 
   const formatPhoneNumber = (phone: string): string => {
-    // Format: +225 05 76 32 0581
-    const cleaned = phone.replace(/\D/g, '');
-    if (cleaned.length === 10) {
-      return `+225 ${cleaned.slice(0, 2)} ${cleaned.slice(2, 4)} ${cleaned.slice(4, 6)} ${cleaned.slice(6)}`;
-    }
+    // Retourner le numéro tel qu'il a été saisi par l'utilisateur
     return phone;
   };
 
@@ -140,76 +136,55 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ navig
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
+      {/* Header avec navigation */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>← Retour</Text>
+          <Text style={styles.backButtonText}>‹</Text>
         </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Image
-            source={require('../assets/8bedea66-f318-404b-8ffd-73beacaa06c5.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-          <Text style={styles.headerTitle}>PAKO Client</Text>
-        </View>
+        <Text style={styles.headerTitle}>Vérification OTP</Text>
+        <View style={styles.headerSpacer} />
       </View>
 
       <View style={styles.content}>
-        <Text style={styles.title}>SAISISSEZ LE CODE À 6 CHIFFRES</Text>
+        {/* Icône centrale */}
+        <View style={styles.iconContainer}>
+          <Text style={styles.otpIcon}>💬</Text>
+        </View>
+
+        {/* Titre principal */}
+        <Text style={styles.title}>Entrez le code de vérification</Text>
         
+        {/* Message d'instruction */}
         <Text style={styles.subtitle}>
-          {isRegistration 
-            ? `Nous l'avons envoyé au ${formatPhoneNumber(phone)} pour vérifier votre compte`
-            : `Nous l'avons envoyé au ${formatPhoneNumber(phone)} pour vous connecter`
-          }
+          Nous avons envoyé un code de vérification à votre numéro de téléphone
+        </Text>
+        
+        {/* Numéro de téléphone */}
+        <Text style={styles.phoneNumber}>{formatPhoneNumber(phone)}</Text>
+
+        {/* Code input fields - 4 chiffres */}
+        <View style={styles.codeContainer}>
+          {Array.from({ length: 4 }, (_, index) => renderCodeInput(index))}
+        </View>
+
+        {/* Timer de renvoi */}
+        <Text style={styles.timerText}>
+          Renvoyer le code dans {Math.floor(timer / 60)}:{(timer % 60).toString().padStart(2, '0')}
         </Text>
 
-        {/* WhatsApp notification hint */}
-        <View style={styles.whatsappHint}>
-          <Text style={styles.whatsappIcon}>📱</Text>
-          <View style={styles.whatsappText}>
-            <Text style={styles.whatsappTitle}>Vérifiez votre WhatsApp</Text>
-            <Text style={styles.whatsappSubtitle}>
-              Le message n'est peut-être pas accompagné d'un son de notification
-            </Text>
-          </View>
-        </View>
-
-        {/* Code input fields */}
-        <View style={styles.codeContainer}>
-          {Array.from({ length: 6 }, (_, index) => renderCodeInput(index))}
-        </View>
-
-        {/* Timer and resend options */}
-        <View style={styles.resendContainer}>
-          <Text style={styles.resendText}>
-            Vous ne l'avez pas reçu? {timer > 0 ? `${timer.toString().padStart(2, '0')}:${(timer % 60).toString().padStart(2, '0')}` : '00:00'}
+        {/* Bouton de vérification */}
+        <TouchableOpacity 
+          style={[styles.verifyButton, code.length === 4 && styles.verifyButtonActive]}
+          onPress={() => handleVerifyCode()}
+          disabled={code.length !== 4 || loading}
+        >
+          <Text style={[styles.verifyButtonText, code.length === 4 && styles.verifyButtonTextActive]}>
+            Vérifier
           </Text>
-          
-          <View style={styles.resendButtons}>
-            <TouchableOpacity
-              style={[styles.resendButton, !canResend && styles.resendButtonDisabled]}
-              onPress={handleResendCode}
-              disabled={!canResend || loading}
-            >
-              <Text style={[styles.resendButtonText, !canResend && styles.resendButtonTextDisabled]}>
-                Renvoyer le code
-              </Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={[styles.resendButton, styles.smsButton]}
-              onPress={handleResendCode}
-              disabled={loading}
-            >
-              <Text style={styles.smsIcon}>💬</Text>
-              <Text style={styles.resendButtonText}>Envoyer par SMS</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+        </TouchableOpacity>
       </View>
     </KeyboardAvoidingView>
   );
@@ -221,138 +196,114 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
-    paddingTop: 60,
+    backgroundColor: COLORS.white,
+    paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  headerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   backButton: {
     padding: 8,
   },
   backButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '500',
-  },
-  logoImage: {
-    width: 80,
-    height: 40,
-    marginRight: 8,
+    color: '#333',
+    fontSize: 24,
+    fontWeight: '300',
   },
   headerTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.white,
+    color: '#333',
+  },
+  headerSpacer: {
+    width: 40,
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
     paddingTop: 40,
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 30,
+  },
+  otpIcon: {
+    fontSize: 60,
+    color: '#FF6B35',
   },
   title: {
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: '#333',
     textAlign: 'center',
     marginBottom: 16,
-    letterSpacing: 1,
   },
   subtitle: {
     fontSize: 16,
-    color: COLORS.textSecondary,
+    color: '#666',
     textAlign: 'center',
-    marginBottom: 24,
+    marginBottom: 8,
     lineHeight: 22,
   },
-  whatsappHint: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 32,
-    alignItems: 'center',
-  },
-  whatsappIcon: {
-    fontSize: 24,
-    marginRight: 12,
-  },
-  whatsappText: {
-    flex: 1,
-  },
-  whatsappTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    marginBottom: 4,
-  },
-  whatsappSubtitle: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    lineHeight: 18,
+  phoneNumber: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    textAlign: 'center',
+    marginBottom: 40,
   },
   codeContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 32,
-    paddingHorizontal: 20,
+    marginBottom: 30,
+    width: '100%',
+    paddingHorizontal: 40,
   },
   codeInput: {
-    width: 45,
-    height: 55,
-    borderWidth: 2,
-    borderColor: COLORS.border,
+    width: 60,
+    height: 60,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     borderRadius: 8,
     fontSize: 24,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: '#333',
     backgroundColor: COLORS.white,
+    textAlign: 'center',
   },
-  resendContainer: {
-    alignItems: 'center',
-  },
-  resendText: {
+  timerText: {
     fontSize: 16,
-    color: COLORS.textSecondary,
-    marginBottom: 16,
+    color: '#666',
+    marginBottom: 40,
   },
-  resendButtons: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    width: '100%',
-  },
-  resendButton: {
-    backgroundColor: COLORS.lightGray,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 8,
-    flex: 0.48,
+  verifyButton: {
+    backgroundColor: '#E0E0E0',
+    paddingVertical: 16,
+    paddingHorizontal: 60,
+    borderRadius: 12,
+    minWidth: 200,
     alignItems: 'center',
   },
-  resendButtonDisabled: {
-    backgroundColor: COLORS.disabled,
+  verifyButtonActive: {
+    backgroundColor: '#FF6B35',
   },
-  resendButtonText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.textPrimary,
-  },
-  resendButtonTextDisabled: {
-    color: COLORS.textSecondary,
-  },
-  smsButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  smsIcon: {
-    marginRight: 8,
+  verifyButtonText: {
     fontSize: 16,
+    fontWeight: '600',
+    color: '#999',
+  },
+  verifyButtonTextActive: {
+    color: COLORS.white,
   },
 });
 

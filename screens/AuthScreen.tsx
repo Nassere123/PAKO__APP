@@ -101,18 +101,26 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
     <KeyboardAvoidingView
       style={styles.container}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+      keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
-      <ScrollView contentContainerStyle={styles.scrollContainer}>
+      <ScrollView 
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+      >
         {/* Contenu principal centré */}
         <View style={styles.mainContent}>
           {/* Icône principale */}
-          <View style={styles.iconContainer}>
-            <Text style={styles.iconText}>📱</Text>
-          </View>
+          <Image 
+            source={require('../assets/salut.gif')} 
+            style={styles.iconImage}
+            resizeMode="contain"
+          />
 
           {/* Titre */}
           <Text style={styles.title}>
-            {isLogin ? 'Connexion' : 'Bienvenue'}
+            {isLogin ? 'Connexion' : 'Bonjour'}
           </Text>
           
           {/* Sous-titre */}
@@ -221,38 +229,35 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     minHeight: '100%',
+    paddingVertical: 20,
   },
   mainContent: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 40,
-    paddingVertical: 60,
+    paddingVertical: 40,
+    minHeight: '100%',
   },
-  iconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
-    backgroundColor: '#FFF3E0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  iconText: {
-    fontSize: 48,
+  iconImage: {
+    width: 140,
+    height: 140,
+    marginBottom: 30,
+    marginTop: 20,
+    alignSelf: 'center',
   },
   title: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: '#333333',
+    color: '#2C3E50',
     textAlign: 'center',
     marginBottom: 12,
   },
   subtitle: {
     fontSize: 16,
-    color: '#666666',
+    color: '#7F8C8D',
     textAlign: 'center',
-    marginBottom: 40,
+    marginBottom: 30,
     lineHeight: 22,
   },
   form: {
@@ -261,13 +266,14 @@ const styles = StyleSheet.create({
   },
   input: {
     marginBottom: 20,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F8F9FA',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
+    borderColor: '#E9ECEF',
     borderRadius: 12,
     paddingHorizontal: 16,
     height: 56,
     fontSize: 16,
+    color: '#2C3E50',
   },
   conditionsContainer: {
     marginBottom: 32,
@@ -288,7 +294,7 @@ const styles = StyleSheet.create({
   },
   conditionsLabel: {
     fontSize: 14,
-    color: '#666666',
+    color: '#7F8C8D',
     lineHeight: 20,
   },
   linkText: {
@@ -327,7 +333,7 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   switchText: {
-    color: '#666666',
+    color: '#7F8C8D',
     fontSize: 14,
   },
   switchLink: {

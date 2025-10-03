@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { View, StyleSheet } from 'react-native';
 import SplashScreen from '../screens/SplashScreen';
 import AppNavigator from '../navigation';
-import { useAuth } from '../hooks';
+import { useAuth, ProfilePhotoProvider } from '../hooks';
 
 const AppWrapper: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
@@ -56,7 +56,11 @@ const AppWrapper: React.FC = () => {
   }
 
   // Afficher l'application principale
-  return <AppNavigator />;
+  return (
+    <ProfilePhotoProvider>
+      <AppNavigator />
+    </ProfilePhotoProvider>
+  );
 };
 
 const styles = StyleSheet.create({

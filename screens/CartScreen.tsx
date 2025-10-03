@@ -49,7 +49,10 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
       {
         id: '1',
         senderName: 'Jean Dupont',
+        senderPhone: '+225 05 76 32 0581',
+        senderAddress: 'Bouaké, Centre-ville',
         receiverName: 'Marie Kouassi',
+        receiverPhone: '+225 07 12 34 5678',
         destinationStation: 'Gare du Nord',
         deliveryAddress: 'Cocody, Riviera 2',
         packages: [
@@ -61,7 +64,10 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
       {
         id: '2',
         senderName: 'Pierre Martin',
+        senderPhone: '+225 05 98 76 5432',
+        senderAddress: 'Daloa, Centre-ville',
         receiverName: 'Fatou Traoré',
+        receiverPhone: '+225 07 65 43 2109',
         destinationStation: 'Gare de Lyon',
         deliveryAddress: 'Plateau, Boulevard Lagunaire',
         packages: [
@@ -216,7 +222,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
             </Text>
             <TouchableOpacity
               style={styles.createButton}
-              onPress={() => navigation.navigate('MultiStepPackageRegistration')}
+              onPress={() => navigation.navigate('MultiStepPackageRegistration', {})}
             >
               <Text style={styles.createButtonText}>Créer une commande</Text>
             </TouchableOpacity>
@@ -227,7 +233,7 @@ const CartScreen: React.FC<CartScreenProps> = ({ navigation }) => {
             
             <TouchableOpacity
               style={styles.addNewButton}
-              onPress={() => navigation.navigate('MultiStepPackageRegistration')}
+              onPress={() => navigation.navigate('MultiStepPackageRegistration', {})}
             >
               <Text style={styles.addNewButtonText}>+ Créer une nouvelle commande</Text>
             </TouchableOpacity>
@@ -244,7 +250,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -256,7 +261,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   backButtonText: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '500',
   },

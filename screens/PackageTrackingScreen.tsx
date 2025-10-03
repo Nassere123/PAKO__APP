@@ -240,7 +240,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -249,12 +248,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '500',
   },
   headerTitle: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 18,
     fontWeight: 'bold',
   },

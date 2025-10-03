@@ -22,10 +22,13 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
   const handlePhoneChange = (text: string): void => {
     // Nettoyer le numéro (garder seulement les chiffres)
     const cleanedText = text.replace(/\D/g, '');
-    setLocalNumber(cleanedText);
+    
+    // Limiter à 10 chiffres maximum
+    const limitedText = cleanedText.slice(0, 10);
+    setLocalNumber(limitedText);
     
     // Construire le numéro complet avec l'indicatif
-    const fullNumber = selectedCountry.dialCode + cleanedText;
+    const fullNumber = selectedCountry.dialCode + limitedText;
     onChangeText(fullNumber);
   };
 

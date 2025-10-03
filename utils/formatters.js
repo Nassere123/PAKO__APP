@@ -4,12 +4,15 @@ export const formatPhoneNumber = (phone) => {
   // Supprimer tous les caractères non numériques
   const cleaned = phone.replace(/\D/g, '');
   
-  // Formater selon le format français
-  if (cleaned.length === 10) {
-    return cleaned.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
+  // Limiter à 10 chiffres maximum
+  const limitedPhone = cleaned.slice(0, 10);
+  
+  // Formater selon le format français (10 chiffres)
+  if (limitedPhone.length === 10) {
+    return limitedPhone.replace(/(\d{2})(\d{2})(\d{2})(\d{2})(\d{2})/, '$1 $2 $3 $4 $5');
   }
   
-  return phone;
+  return limitedPhone;
 };
 
 export const formatPostalCode = (code) => {

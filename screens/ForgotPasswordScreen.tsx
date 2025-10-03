@@ -151,7 +151,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 60,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -160,7 +159,7 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   backButtonText: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '500',
   },

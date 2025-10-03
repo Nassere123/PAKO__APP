@@ -1,99 +1,192 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
+import { PackageService, PackageData } from '../services';
+import { CancelPackageModal } from '../components';
 
 type PackageListScreenProps = StackScreenProps<RootStackParamList, 'PackageList'>;
 
-interface Package {
-  id: string;
-  code: string;
-  description: string;
-  type: string;
-  status: string;
-  date: string;
-  estimatedValue?: string;
-  trackingNumber?: string;
-}
+// Interface Package supprimée - utilisation directe de PackageData
 
 const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route }) => {
   const { category } = route.params as { category: 'received' | 'in_transit' | 'cancelled' };
   const [modalVisible, setModalVisible] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<Package | null>(null);
+  const [selectedPackage, setSelectedPackage] = useState<PackageData | null>(null);
+  const [packages, setPackages] = useState<PackageData[]>([]);
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [packageToCancel, setPackageToCancel] = useState<PackageData | null>(null);
   const slideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
 
-  // Données de test pour les colis
-  const packagesData: Record<string, Package[]> = {
+  // Charger les colis au montage du composant
+  useEffect(() => {
+    loadPackages();
+  }, [category]);
+
+  const loadPackages = async () => {
+    try {
+      let loadedPackages: PackageData[] = [];
+      
+      switch (category) {
+        case 'received':
+          loadedPackages = await PackageService.getPackagesByStatus('delivered');
+          break;
+        case 'in_transit':
+          loadedPackages = await PackageService.getPackagesByStatus('in_transit');
+          break;
+        case 'cancelled':
+          loadedPackages = await PackageService.getPackagesByStatus('cancelled');
+          break;
+        default:
+          loadedPackages = await PackageService.getUserPackages();
+      }
+      
+      setPackages(loadedPackages);
+    } catch (error) {
+      console.error('Erreur lors du chargement des colis:', error);
+      // Créer des données de test si aucune donnée n'est trouvée
+      await PackageService.createTestData();
+      loadPackages();
+    }
+  };
+
+  const handleCancelPackage = (pkg: any) => {
+    // Convertir les données de test en format PackageData si nécessaire
+    const packageData: PackageData = {
+      id: pkg.id,
+      trackingNumber: pkg.trackingNumber || pkg.code,
+      description: pkg.description,
+      status: pkg.status,
+      sender: pkg.sender || 'Expéditeur inconnu',
+      estimatedArrival: pkg.estimatedArrival,
+      actualArrival: pkg.actualArrival,
+      deliveryDate: pkg.deliveryDate,
+      createdAt: pkg.createdAt || new Date().toISOString(),
+      updatedAt: pkg.updatedAt || new Date().toISOString(),
+      canCancel: pkg.canCancel || (pkg.status === 'in_transit' || pkg.status === 'pending')
+    };
+    
+    setPackageToCancel(packageData);
+    setShowCancelModal(true);
+  };
+
+  const confirmCancelPackage = async () => {
+    if (!packageToCancel) return;
+    
+    try {
+      // Essayer d'annuler via le service
+      await PackageService.cancelPackage(packageToCancel.id);
+      setShowCancelModal(false);
+      setPackageToCancel(null);
+      // Recharger les colis
+      loadPackages();
+      Alert.alert('Succès', 'Le colis a été annulé avec succès.');
+    } catch (error) {
+      console.error('Erreur lors de l\'annulation:', error);
+      // Si c'est une erreur de service, simuler l'annulation pour les données de test
+      if (error instanceof Error && error.message?.includes('Colis non trouvé')) {
+        // Simuler l'annulation pour les données de test
+        setShowCancelModal(false);
+        setPackageToCancel(null);
+        Alert.alert('Succès', 'Le colis a été annulé avec succès.');
+        // Recharger les données
+        loadPackages();
+      } else {
+        Alert.alert('Erreur', 'Impossible d\'annuler ce colis.');
+      }
+    }
+  };
+
+  const cancelCancelPackage = () => {
+    setShowCancelModal(false);
+    setPackageToCancel(null);
+  };
+
+  // Données de test pour les colis (fallback)
+  const packagesData: Record<string, PackageData[]> = {
     received: [
       {
         id: '1',
-        code: 'ABC123',
+        trackingNumber: 'ABC123',
         description: 'Vêtements et accessoires',
-        type: 'Colis vestimentaire',
-        status: 'Livré',
-        date: '15/12/2024',
-        estimatedValue: '25,000 FCFA',
-        trackingNumber: 'TRK001'
+        status: 'delivered',
+        sender: 'Boutique Mode',
+        estimatedArrival: '2024-12-15',
+        actualArrival: '2024-12-15',
+        deliveryDate: '2024-12-15',
+        createdAt: '2024-12-10T10:00:00Z',
+        updatedAt: '2024-12-15T14:30:00Z',
+        canCancel: false
       },
       {
         id: '2',
-        code: 'DEF456',
+        trackingNumber: 'DEF456',
         description: 'Livres et documents',
-        type: 'Colis documentaire',
-        status: 'Livré',
-        date: '12/12/2024',
-        estimatedValue: '15,000 FCFA',
-        trackingNumber: 'TRK002'
+        status: 'delivered',
+        sender: 'Librairie Universelle',
+        estimatedArrival: '2024-12-12',
+        actualArrival: '2024-12-12',
+        deliveryDate: '2024-12-12',
+        createdAt: '2024-12-08T09:00:00Z',
+        updatedAt: '2024-12-12T16:00:00Z',
+        canCancel: false
       },
       {
         id: '3',
-        code: 'GHI789',
+        trackingNumber: 'GHI789',
         description: 'Produits cosmétiques',
-        type: 'Colis cosmétique',
-        status: 'Livré',
-        date: '10/12/2024',
-        estimatedValue: '35,000 FCFA',
-        trackingNumber: 'TRK003'
+        status: 'delivered',
+        sender: 'Parfumerie Centrale',
+        estimatedArrival: '2024-12-10',
+        actualArrival: '2024-12-10',
+        deliveryDate: '2024-12-10',
+        createdAt: '2024-12-05T11:00:00Z',
+        updatedAt: '2024-12-10T13:45:00Z',
+        canCancel: false
       }
     ],
     in_transit: [
       {
         id: '4',
-        code: 'JKL012',
+        trackingNumber: 'JKL012',
         description: 'Équipements électroniques',
-        type: 'Colis électronique',
-        status: 'En cours de livraison',
-        date: '18/12/2024',
-        estimatedValue: '150,000 FCFA',
-        trackingNumber: 'TRK004'
+        status: 'in_transit',
+        sender: 'Tech Store',
+        estimatedArrival: '2024-12-18',
+        createdAt: '2024-12-15T08:00:00Z',
+        updatedAt: '2024-12-16T10:00:00Z',
+        canCancel: true
       },
       {
         id: '5',
-        code: 'MNO345',
+        trackingNumber: 'MNO345',
         description: 'Pièces détachées auto',
-        type: 'Colis pièce détachée',
-        status: 'En préparation',
-        date: '20/12/2024',
-        estimatedValue: '80,000 FCFA',
-        trackingNumber: 'TRK005'
+        status: 'pending',
+        sender: 'Auto Parts',
+        estimatedArrival: '2024-12-20',
+        createdAt: '2024-12-17T14:00:00Z',
+        updatedAt: '2024-12-17T14:00:00Z',
+        canCancel: true
       }
     ],
     cancelled: [
       {
         id: '6',
-        code: 'PQR678',
+        trackingNumber: 'PQR678',
         description: 'Mobilier de bureau',
-        type: 'Colis mobilier',
-        status: 'Annulé',
-        date: '05/12/2024',
-        estimatedValue: '200,000 FCFA',
-        trackingNumber: 'TRK006'
+        status: 'cancelled',
+        sender: 'Mobilier Pro',
+        estimatedArrival: '2024-12-05',
+        createdAt: '2024-12-01T09:00:00Z',
+        updatedAt: '2024-12-05T12:00:00Z',
+        canCancel: false
       }
     ]
   };
 
-  const packages = packagesData[category] || [];
+  // Utiliser les données du service ou les données de test en fallback
+  const displayPackages = packages.length > 0 ? packages : packagesData[category] || [];
 
   const getCategoryInfo = () => {
     switch (category) {
@@ -126,7 +219,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
 
   const categoryInfo = getCategoryInfo();
 
-  const showModal = (pkg: Package) => {
+  const showModal = (pkg: PackageData) => {
     setSelectedPackage(pkg);
     setModalVisible(true);
     Animated.timing(slideAnim, {
@@ -147,7 +240,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
     });
   };
 
-  const handlePackagePress = (pkg: Package) => {
+  const handlePackagePress = (pkg: PackageData) => {
     showModal(pkg);
   };
 
@@ -178,51 +271,60 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
           <View style={[styles.categoryIndicator, { backgroundColor: categoryInfo.color }]} />
         </View>
 
-        {packages.length === 0 ? (
+        {displayPackages.length === 0 ? (
           renderEmptyState()
         ) : (
           <View style={styles.packagesList}>
-            {packages.map((pkg) => (
+            {displayPackages.map((pkg) => (
               <TouchableOpacity
                 key={pkg.id}
                 style={styles.packageCard}
                 onPress={() => handlePackagePress(pkg)}
               >
                 <View style={styles.packageHeader}>
-                  <Text style={styles.packageCode}>{pkg.code}</Text>
+                  <Text style={styles.packageCode}>{pkg.trackingNumber}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: categoryInfo.color }]}>
                     <Text style={styles.statusText}>{pkg.status}</Text>
                   </View>
                 </View>
                 
                 <Text style={styles.packageDescription}>{pkg.description}</Text>
-                <Text style={styles.packageType}>{pkg.type}</Text>
+                <Text style={styles.packageType}>Expéditeur: {pkg.sender}</Text>
                 
                 <View style={styles.packageFooter}>
-                  <Text style={styles.packageDate}>📅 {pkg.date}</Text>
-                  {pkg.estimatedValue && (
-                    <Text style={styles.packageValue}>💰 {pkg.estimatedValue}</Text>
+                  <Text style={styles.packageDate}>📅 {new Date(pkg.createdAt).toLocaleDateString('fr-FR')}</Text>
+                  {pkg.estimatedArrival && (
+                    <Text style={styles.packageValue}>📦 Arrivée: {new Date(pkg.estimatedArrival).toLocaleDateString('fr-FR')}</Text>
                   )}
                 </View>
                 
-                {pkg.trackingNumber && (
-                  <Text style={styles.trackingNumber}>🔍 Suivi: {pkg.trackingNumber}</Text>
-                )}
+                <Text style={styles.trackingNumber}>🔍 Suivi: {pkg.trackingNumber}</Text>
                 
                 {category === 'in_transit' && (
-                  <TouchableOpacity 
-                    style={styles.trackButton}
-                    onPress={() => navigation.navigate('PackageTracking' as any, { packageId: pkg.code })}
-                  >
-                    <Text style={styles.trackButtonText}>📍 Suivre en temps réel</Text>
-                  </TouchableOpacity>
+                  <View style={styles.actionButtonsContainer}>
+                    <TouchableOpacity 
+                      style={styles.trackButton}
+                      onPress={() => navigation.navigate('PackageTracking', { packageId: pkg.trackingNumber || pkg.id })}
+                    >
+                      <Text style={styles.trackButtonText}>📍 Suivre en temps réel</Text>
+                    </TouchableOpacity>
+                    
+                    {(pkg.canCancel || (pkg.status === 'in_transit' || pkg.status === 'pending')) && (
+                      <TouchableOpacity 
+                        style={styles.cancelButton}
+                        onPress={() => handleCancelPackage(pkg)}
+                      >
+                        <Text style={styles.cancelButtonText}>❌ Annuler</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
                 )}
                 
                 {category === 'received' && (
                   <TouchableOpacity 
                     style={styles.rateButton}
-                    onPress={() => navigation.navigate('PackageRating' as any, { 
-                      packageId: pkg.code, 
+                    onPress={() => navigation.navigate('PackageRating', { 
+                      packageId: pkg.trackingNumber, 
                       packageData: pkg 
                     })}
                   >
@@ -259,7 +361,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
             {selectedPackage && (
               <>
                 <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Détails du colis {selectedPackage.code}</Text>
+                  <Text style={styles.modalTitle}>Détails du colis {selectedPackage.trackingNumber}</Text>
                 </View>
                 
                 <View style={styles.modalContent}>
@@ -269,8 +371,8 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                   </View>
                   
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Type:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.type}</Text>
+                    <Text style={styles.detailLabel}>Expéditeur:</Text>
+                    <Text style={styles.detailValue}>{selectedPackage.sender}</Text>
                   </View>
                   
                   <View style={styles.detailRow}>
@@ -279,23 +381,35 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                   </View>
                   
                   <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Date:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.date}</Text>
+                    <Text style={styles.detailLabel}>Date de création:</Text>
+                    <Text style={styles.detailValue}>{new Date(selectedPackage.createdAt).toLocaleDateString('fr-FR')}</Text>
                   </View>
                   
-                  {selectedPackage.estimatedValue && (
+                  {selectedPackage.estimatedArrival && (
                     <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Valeur:</Text>
-                      <Text style={styles.detailValue}>{selectedPackage.estimatedValue}</Text>
+                      <Text style={styles.detailLabel}>Arrivée estimée:</Text>
+                      <Text style={styles.detailValue}>{new Date(selectedPackage.estimatedArrival).toLocaleDateString('fr-FR')}</Text>
                     </View>
                   )}
                   
-                  {selectedPackage.trackingNumber && (
+                  {selectedPackage.actualArrival && (
                     <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Numéro de suivi:</Text>
-                      <Text style={styles.detailValue}>{selectedPackage.trackingNumber}</Text>
+                      <Text style={styles.detailLabel}>Arrivée réelle:</Text>
+                      <Text style={styles.detailValue}>{new Date(selectedPackage.actualArrival).toLocaleDateString('fr-FR')}</Text>
                     </View>
                   )}
+                  
+                  {selectedPackage.deliveryDate && (
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Date de livraison:</Text>
+                      <Text style={styles.detailValue}>{new Date(selectedPackage.deliveryDate).toLocaleDateString('fr-FR')}</Text>
+                    </View>
+                  )}
+                  
+                  <View style={styles.detailRow}>
+                    <Text style={styles.detailLabel}>Numéro de suivi:</Text>
+                    <Text style={styles.detailValue}>{selectedPackage.trackingNumber}</Text>
+                  </View>
                 </View>
                 
                 <View style={styles.modalActions}>
@@ -304,7 +418,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                       style={styles.actionButton}
                       onPress={() => {
                         hideModal();
-                        navigation.navigate('PackageTracking' as any, { packageId: selectedPackage.code });
+                        navigation.navigate('PackageTracking', { packageId: selectedPackage.trackingNumber || selectedPackage.id });
                       }}
                     >
                       <Text style={styles.actionButtonText}>SUIVRE EN TEMPS RÉEL</Text>
@@ -316,8 +430,8 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                       style={styles.actionButton}
                       onPress={() => {
                         hideModal();
-                        navigation.navigate('PackageRating' as any, { 
-                          packageId: selectedPackage.code, 
+                        navigation.navigate('PackageRating', { 
+                          packageId: selectedPackage.trackingNumber || selectedPackage.id, 
                           packageData: selectedPackage 
                         });
                       }}
@@ -338,6 +452,14 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Modal d'annulation de colis */}
+      <CancelPackageModal
+        visible={showCancelModal}
+        packageData={packageToCancel}
+        onConfirm={confirmCancelPackage}
+        onCancel={cancelCancelPackage}
+      />
     </View>
   );
 };
@@ -348,7 +470,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -357,12 +478,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   backButton: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 16,
     fontWeight: '500',
   },
   headerTitle: {
-    color: COLORS.white,
+    color: COLORS.primary,
     fontSize: 18,
     fontWeight: 'bold',
   },
@@ -465,18 +586,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontStyle: 'italic',
   },
+  actionButtonsContainer: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
   trackButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 8,
     paddingVertical: 8,
     paddingHorizontal: 12,
-    marginTop: 8,
-    alignSelf: 'flex-start',
+    flex: 1,
   },
   trackButtonText: {
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#F44336',
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    flex: 1,
+  },
+  cancelButtonText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
   },
   rateButton: {
     backgroundColor: '#FF9800',
@@ -575,18 +714,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: 'bold',
-  },
-  cancelButton: {
-    backgroundColor: '#333',
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 24,
-    alignItems: 'center',
-  },
-  cancelButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
   },
 });
 

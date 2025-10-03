@@ -2,3 +2,4 @@
 export * from './authService';
 export * from './userService';
 export * from './userStorage';
+export * from './packageService';

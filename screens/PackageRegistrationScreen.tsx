@@ -107,8 +107,13 @@ const PackageRegistrationScreen: React.FC<PackageRegistrationScreenProps> = ({ n
             style={styles.input}
             placeholder="Téléphone expéditeur"
             value={formData.senderPhone}
-            onChangeText={(value) => handleInputChange('senderPhone', value)}
+            onChangeText={(value) => {
+              // Limiter à 10 chiffres maximum
+              const cleaned = value.replace(/\D/g, '').slice(0, 10);
+              handleInputChange('senderPhone', cleaned);
+            }}
             keyboardType="phone-pad"
+            maxLength={10}
           />
           
           <TextInput
@@ -135,8 +140,13 @@ const PackageRegistrationScreen: React.FC<PackageRegistrationScreenProps> = ({ n
             style={styles.input}
             placeholder="Votre téléphone"
             value={formData.receiverPhone}
-            onChangeText={(value) => handleInputChange('receiverPhone', value)}
+            onChangeText={(value) => {
+              // Limiter à 10 chiffres maximum
+              const cleaned = value.replace(/\D/g, '').slice(0, 10);
+              handleInputChange('receiverPhone', cleaned);
+            }}
             keyboardType="phone-pad"
+            maxLength={10}
           />
           
           <TextInput
@@ -245,7 +255,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,

@@ -11,17 +11,7 @@ import {
 import { Button } from '../components';
 import { COLORS } from '../constants';
 import { useAuth } from '../hooks';
-
-interface WelcomeScreenProps {
-  navigation: any;
-  route: {
-    params: {
-      firstName: string;
-      lastName: string;
-      phone: string;
-    };
-  };
-}
+import { WelcomeScreenProps } from '../types/navigation';
 
 const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
   const { firstName, lastName, phone } = route.params || {};
@@ -35,7 +25,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
   // Si aucun paramètre n'est fourni, rediriger vers Auth
   React.useEffect(() => {
     if (!firstName && !lastName && !phone) {
-      navigation.replace('Auth');
+      navigation.replace('Auth', {});
     }
   }, [firstName, lastName, phone, navigation]);
 
@@ -181,7 +171,7 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    marginTop: 60,
+    marginTop: 40,
   },
   successIcon: {
     width: 100,
@@ -190,7 +180,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#4CAF50',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 50,
     shadowColor: '#4CAF50',
     shadowOffset: {
       width: 0,
@@ -218,12 +208,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   welcomeMessage: {
-    fontSize: 24,
-    color: COLORS.textSecondary,
+    fontSize: 32,
+    color: '#000000',
     textAlign: 'center',
     marginBottom: 20,
-    lineHeight: 32,
-    fontWeight: '600',
+    lineHeight: 40,
+    fontWeight: 'bold',
   },
   userName: {
     color: COLORS.primary,

@@ -14,6 +14,7 @@ import {
   MultiStepPackageRegistrationScreen,
   EvaluationScreen,
   PaymentScreen,
+  CartScreen,
   MyPackagesScreen,
   PackageListScreen,
   PackageRatingScreen
@@ -44,7 +45,7 @@ const AppNavigator: React.FC = () => {
         />
         <Stack.Screen 
           name="Welcome" 
-          component={WelcomeScreen} 
+          component={WelcomeScreen as any} 
           options={{ headerShown: false }}
         />
         <Stack.Screen 
@@ -60,12 +61,12 @@ const AppNavigator: React.FC = () => {
         <Stack.Screen 
           name="Home" 
           component={HomeScreen} 
-          options={{ title: 'PAKO Client' }}
+          options={{ headerShown: false }}
         />
         <Stack.Screen
           name="Profile"
           component={ProfileScreen}
-          options={{ title: 'Profil' }}
+          options={{ title: 'Mon Profil' }}
         />
         <Stack.Screen
           name="PackageTracking"
@@ -96,6 +97,11 @@ const AppNavigator: React.FC = () => {
           name="Payment"
           component={PaymentScreen}
           options={{ title: 'Paiement' }}
+        />
+        <Stack.Screen
+          name="Cart"
+          component={CartScreen}
+          options={{ title: 'Panier' }}
         />
         <Stack.Screen
           name="MyPackages"

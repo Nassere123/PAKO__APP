@@ -28,7 +28,8 @@ interface PackageData {
 interface OrderData {
   senderName: string;
   senderPhone: string;
-  senderAddress: string;
+  senderCity: string;
+  senderDistrict: string;
   receiverName: string;
   receiverPhone: string;
   deliveryAddress: string;
@@ -64,11 +65,35 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     { value: 'gare_man', label: '🚉 Gare de Man', description: 'Man - Ouest' },
     { value: 'gare_daloa', label: '🚉 Gare de Daloa', description: 'Daloa - Centre-Ouest' },
   ];
+
+  const coteIvoireCities = [
+    { value: 'abidjan', label: '🏙️ Abidjan', description: 'District autonome' },
+    { value: 'bouake', label: '🏙️ Bouaké', description: 'Vallée du Bandama' },
+    { value: 'daloa', label: '🏙️ Daloa', description: 'Haut-Sassandra' },
+    { value: 'san_pedro', label: '🏙️ San-Pédro', description: 'Bas-Sassandra' },
+    { value: 'korhogo', label: '🏙️ Korhogo', description: 'Poro' },
+    { value: 'man', label: '🏙️ Man', description: 'Tonkpi' },
+    { value: 'gagnoa', label: '🏙️ Gagnoa', description: 'Gôh' },
+    { value: 'yamoussoukro', label: '🏙️ Yamoussoukro', description: 'Yamoussoukro' },
+    { value: 'divo', label: '🏙️ Divo', description: 'Lôh-Djiboua' },
+    { value: 'anyama', label: '🏙️ Anyama', description: 'Lagunes' },
+    { value: 'abengourou', label: '🏙️ Abengourou', description: 'Indénié-Djuablin' },
+    { value: 'bondoukou', label: '🏙️ Bondoukou', description: 'Gontougo' },
+    { value: 'odienne', label: '🏙️ Odienné', description: 'Kabadougou' },
+    { value: 'seguela', label: '🏙️ Séguéla', description: 'Worodougou' },
+    { value: 'touba', label: '🏙️ Touba', description: 'Bafing' },
+    { value: 'bangolo', label: '🏙️ Bangolo', description: 'Guémon' },
+    { value: 'duékoué', label: '🏙️ Duékoué', description: 'Cavally' },
+    { value: 'guiglo', label: '🏙️ Guiglo', description: 'Cavally' },
+    { value: 'tabou', label: '🏙️ Tabou', description: 'Nawa' },
+    { value: 'soubre', label: '🏙️ Soubré', description: 'Nawa' },
+  ];
   
   const [orderData, setOrderData] = useState<OrderData>({
     senderName: '',
     senderPhone: '',
-    senderAddress: '',
+    senderCity: '',
+    senderDistrict: '',
     receiverName: '',
     receiverPhone: '',
     deliveryAddress: '',
@@ -86,6 +111,10 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
 
   const [showPackageTypeSelector, setShowPackageTypeSelector] = useState(false);
   const [showStationSelector, setShowStationSelector] = useState(false);
+  const [showCitySelector, setShowCitySelector] = useState(false);
+  const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
+  const [isTypingAddress, setIsTypingAddress] = useState(false);
 
   const totalSteps = 3;
 
@@ -119,6 +148,222 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     setShowStationSelector(false);
   };
 
+  const handleCitySelect = (city: string) => {
+    setOrderData(prev => ({
+      ...prev,
+      senderCity: city
+    }));
+    setShowCitySelector(false);
+  };
+
+  // Base de données des zones de livraison de la Côte d'Ivoire
+  const deliveryZones = [
+    // ABIDJAN - COCODY
+    "Cocody, Riviera 2, Abidjan",
+    "Cocody, Riviera 3, Abidjan", 
+    "Cocody, Riviera 4, Abidjan",
+    "Cocody, Angré 8ème Tranche, Abidjan",
+    "Cocody, Angré 7ème Tranche, Abidjan",
+    "Cocody, 2 Plateaux, Abidjan",
+    "Cocody, 7ème Tranche, Abidjan",
+    "Cocody, Ambassade, Abidjan",
+    "Cocody, Cité des Arts, Abidjan",
+    "Cocody, Les Jardins, Abidjan",
+    "Cocody, Mermoz, Abidjan",
+    "Cocody, Zone 4, Abidjan",
+    
+    // ABIDJAN - PLATEAU
+    "Plateau, Boulevard Lagunaire, Abidjan",
+    "Plateau, Avenue Franchet d'Esperey, Abidjan",
+    "Plateau, Rue du Commerce, Abidjan",
+    "Plateau, Avenue Delafosse, Abidjan",
+    "Plateau, Avenue Noguès, Abidjan",
+    "Plateau, Avenue Binger, Abidjan",
+    "Plateau, Rue des Jardins, Abidjan",
+    "Plateau, Avenue Chardy, Abidjan",
+    
+    // ABIDJAN - MARCORY
+    "Marcory, Zone 4, Abidjan",
+    "Marcory, Résidentiel, Abidjan",
+    "Marcory, Zone 3, Abidjan",
+    "Marcory, Zone 2, Abidjan",
+    "Marcory, Zone 1, Abidjan",
+    "Marcory, Riviera Palmeraie, Abidjan",
+    
+    // ABIDJAN - YOPOUGON
+    "Yopougon, Sicogi, Abidjan",
+    "Yopougon, Andokoi, Abidjan",
+    "Yopougon, Toit Rouge, Abidjan",
+    "Yopougon, Gesco, Abidjan",
+    "Yopougon, Niangon, Abidjan",
+    "Yopougon, Sagbé, Abidjan",
+    "Yopougon, Koweït, Abidjan",
+    "Yopougon, Cité An 2000, Abidjan",
+    
+    // ABIDJAN - ADJAMÉ
+    "Adjamé, Gare du Nord, Abidjan",
+    "Adjamé, Rond-point de la Paix, Abidjan",
+    "Adjamé, Rond-point de l'Indépendance, Abidjan",
+    "Adjamé, Rond-point de l'Unité, Abidjan",
+    "Adjamé, Rond-point de la République, Abidjan",
+    "Adjamé, Rond-point de la Fraternité, Abidjan",
+    
+    // ABIDJAN - KOUMASSI
+    "Koumassi, Zone Industrielle, Abidjan",
+    "Koumassi, Remblais, Abidjan",
+    "Koumassi, Sicogi, Abidjan",
+    "Koumassi, Cité An 2000, Abidjan",
+    "Koumassi, Rond-point de la Paix, Abidjan",
+    
+    // ABIDJAN - PORT-BOUËT
+    "Port-Bouët, Aéroport, Abidjan",
+    "Port-Bouët, Vridi, Abidjan",
+    "Port-Bouët, Zone Industrielle, Abidjan",
+    "Port-Bouët, Rond-point de la Paix, Abidjan",
+    "Port-Bouët, Cité An 2000, Abidjan",
+    
+    // ABIDJAN - AUTRES COMMUNES
+    "Bingerville, Centre, Abidjan",
+    "Bingerville, Rond-point de la Paix, Abidjan",
+    "Anyama, Centre, Abidjan",
+    "Anyama, Rond-point de la Paix, Abidjan",
+    "Songon, Centre, Abidjan",
+    "Songon, Rond-point de la Paix, Abidjan",
+    "Attécoubé, Centre, Abidjan",
+    "Attécoubé, Rond-point de la Paix, Abidjan",
+    "Treichville, Centre, Abidjan",
+    "Treichville, Rond-point de la Paix, Abidjan",
+    
+    // BOUAKÉ
+    "Bouaké, Centre-ville",
+    "Bouaké, Air France",
+    "Bouaké, Belleville",
+    "Bouaké, Rond-point de la Paix",
+    "Bouaké, Rond-point de l'Indépendance",
+    "Bouaké, Rond-point de l'Unité",
+    "Bouaké, Rond-point de la République",
+    "Bouaké, Rond-point de la Fraternité",
+    
+    // DALOA
+    "Daloa, Centre-ville",
+    "Daloa, Air France",
+    "Daloa, Rond-point de la Paix",
+    "Daloa, Rond-point de l'Indépendance",
+    "Daloa, Rond-point de l'Unité",
+    "Daloa, Rond-point de la République",
+    "Daloa, Rond-point de la Fraternité",
+    
+    // SAN-PÉDRO
+    "San-Pédro, Centre-ville",
+    "San-Pédro, Port",
+    "San-Pédro, Rond-point de la Paix",
+    "San-Pédro, Rond-point de l'Indépendance",
+    "San-Pédro, Rond-point de l'Unité",
+    "San-Pédro, Rond-point de la République",
+    "San-Pédro, Rond-point de la Fraternité",
+    
+    // KORHOGO
+    "Korhogo, Centre-ville",
+    "Korhogo, Rond-point de la Paix",
+    "Korhogo, Rond-point de l'Indépendance",
+    "Korhogo, Rond-point de l'Unité",
+    "Korhogo, Rond-point de la République",
+    "Korhogo, Rond-point de la Fraternité",
+    
+    // MAN
+    "Man, Centre-ville",
+    "Man, Rond-point de la Paix",
+    "Man, Rond-point de l'Indépendance",
+    "Man, Rond-point de l'Unité",
+    "Man, Rond-point de la République",
+    "Man, Rond-point de la Fraternité",
+    
+    // GAGNOA
+    "Gagnoa, Centre-ville",
+    "Gagnoa, Rond-point de la Paix",
+    "Gagnoa, Rond-point de l'Indépendance",
+    "Gagnoa, Rond-point de l'Unité",
+    "Gagnoa, Rond-point de la République",
+    "Gagnoa, Rond-point de la Fraternité",
+    
+    // YAMOUSSOUKRO
+    "Yamoussoukro, Centre-ville",
+    "Yamoussoukro, Rond-point de la Paix",
+    "Yamoussoukro, Rond-point de l'Indépendance",
+    "Yamoussoukro, Rond-point de l'Unité",
+    "Yamoussoukro, Rond-point de la République",
+    "Yamoussoukro, Rond-point de la Fraternité",
+    
+    // DIVO
+    "Divo, Centre-ville",
+    "Divo, Rond-point de la Paix",
+    "Divo, Rond-point de l'Indépendance",
+    "Divo, Rond-point de l'Unité",
+    "Divo, Rond-point de la République",
+    "Divo, Rond-point de la Fraternité",
+    
+    // AUTRES VILLES
+    "Abengourou, Centre-ville",
+    "Bondoukou, Centre-ville",
+    "Odienné, Centre-ville",
+    "Séguéla, Centre-ville",
+    "Touba, Centre-ville",
+    "Bangolo, Centre-ville",
+    "Duékoué, Centre-ville",
+    "Guiglo, Centre-ville",
+    "Tabou, Centre-ville",
+    "Soubré, Centre-ville"
+  ];
+
+  // Fonction pour générer des suggestions d'adresses basées sur les zones de livraison
+  const generateAddressSuggestions = (query: string): string[] => {
+    if (!query || query.length < 1) return [];
+    
+    const normalizedQuery = query.toLowerCase().trim();
+    
+    // Recherche intelligente : priorité aux correspondances exactes, puis partielles
+    const exactMatches = deliveryZones.filter(zone => 
+      zone.toLowerCase().startsWith(normalizedQuery)
+    );
+    
+    const partialMatches = deliveryZones.filter(zone => 
+      zone.toLowerCase().includes(normalizedQuery) && 
+      !zone.toLowerCase().startsWith(normalizedQuery)
+    );
+    
+    // Combiner les résultats avec priorité aux correspondances exactes
+    const suggestions = [...exactMatches, ...partialMatches];
+    
+    return suggestions.slice(0, 6); // Limiter à 6 suggestions
+  };
+
+  const handleAddressInputChange = (text: string) => {
+    setOrderData(prev => ({
+      ...prev,
+      deliveryAddress: text
+    }));
+    
+    // Déclencher les suggestions dès la première lettre tapée
+    if (text.length >= 1) {
+      const suggestions = generateAddressSuggestions(text);
+      setAddressSuggestions(suggestions);
+      setShowAddressSuggestions(suggestions.length > 0);
+    } else {
+      setShowAddressSuggestions(false);
+      setAddressSuggestions([]);
+    }
+  };
+
+  const handleAddressSuggestionSelect = (address: string) => {
+    setOrderData(prev => ({
+      ...prev,
+      deliveryAddress: address
+    }));
+    setShowAddressSuggestions(false);
+    setAddressSuggestions([]);
+    setIsTypingAddress(false);
+  };
+
   const handleAddPackage = () => {
     if (!currentPackage.packageCode || !currentPackage.packageDescription || !currentPackage.packageType) {
       Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
@@ -149,7 +394,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
   const validateCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        if (!orderData.senderName || !orderData.senderPhone || !orderData.receiverName || !orderData.receiverPhone || !orderData.deliveryAddress || !orderData.destinationStation) {
+        if (!orderData.senderName || !orderData.senderPhone || !orderData.senderCity || !orderData.receiverName || !orderData.receiverPhone || !orderData.deliveryAddress || !orderData.destinationStation) {
           Alert.alert('Erreur', 'Veuillez remplir tous les champs obligatoires');
           return false;
         }
@@ -175,11 +420,6 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
   };
 
   const handleGetCurrentLocation = async () => {
-    // Ne déclencher la géolocalisation que si le champ est vide
-    if (orderData.deliveryAddress.trim() !== '') {
-      return;
-    }
-
     try {
       // Demander les permissions de géolocalisation
       if (Platform.OS === 'android') {
@@ -195,36 +435,40 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         );
         
         if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
-          Alert.alert('Permission refusée', 'La géolocalisation est nécessaire pour obtenir votre adresse');
+          Alert.alert('Permission refusée', 'La géolocalisation est nécessaire pour sélectionner votre adresse sur la carte');
           return;
         }
       }
 
-      // Simulation de géolocalisation (remplacer par une vraie API de géolocalisation)
+      // Simulation d'ouverture de carte (remplacer par une vraie intégration de carte)
       Alert.alert(
-        'Géolocalisation',
-        'Récupération de votre position...',
+        'Sélection d\'adresse',
+        'Ouverture de la carte pour sélectionner votre adresse de livraison...',
         [{ text: 'OK' }]
       );
 
-      // Simulation d'une adresse récupérée
+      // Simulation de sélection d'adresse sur la carte
       setTimeout(() => {
-        const mockAddress = "Cocody, Abidjan - Côte d'Ivoire";
+        const mockAddress = "Cocody, Riviera 2, Abidjan - Côte d'Ivoire";
         setOrderData(prev => ({
           ...prev,
           deliveryAddress: mockAddress
         }));
         
         Alert.alert(
-          'Position détectée',
-          `Adresse détectée : ${mockAddress}\n\nVoulez-vous utiliser cette adresse ?`,
+          'Adresse sélectionnée',
+          `Adresse choisie : ${mockAddress}\n\nVoulez-vous confirmer cette adresse ?`,
           [
-            { text: 'Non', style: 'cancel' },
+            { text: 'Changer', style: 'cancel', onPress: () => {
+              setOrderData(prev => ({
+                ...prev,
+                deliveryAddress: ''
+              }));
+            }},
             { 
-              text: 'Oui', 
+              text: 'Confirmer', 
               onPress: () => {
-                // L'adresse est déjà mise à jour
-                Alert.alert('Succès', 'Adresse de livraison mise à jour !');
+                Alert.alert('Succès', 'Adresse de livraison confirmée !');
               }
             }
           ]
@@ -232,7 +476,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       }, 2000);
 
     } catch (error) {
-      Alert.alert('Erreur', 'Impossible d\'obtenir votre position. Veuillez saisir manuellement votre adresse.');
+      Alert.alert('Erreur', 'Impossible d\'ouvrir la carte. Veuillez réessayer.');
     }
   };
 
@@ -305,11 +549,55 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           style={styles.phoneInput}
         />
         
+        {/* Sélecteur de ville */}
+        <TouchableOpacity 
+          style={styles.citySelector}
+          onPress={() => setShowCitySelector(!showCitySelector)}
+        >
+          <Text style={[
+            styles.citySelectorText,
+            !orderData.senderCity && styles.placeholderText
+          ]}>
+            {orderData.senderCity 
+              ? coteIvoireCities.find(city => city.value === orderData.senderCity)?.label 
+              : 'Ville de provenance *'
+            }
+          </Text>
+          <Text style={styles.dropdownIcon}>
+            {showCitySelector ? '▲' : '▼'}
+          </Text>
+        </TouchableOpacity>
+        
+        {showCitySelector && (
+          <View style={styles.cityOptions}>
+            <ScrollView 
+              style={styles.cityScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {coteIvoireCities.map((city) => (
+                <TouchableOpacity
+                  key={city.value}
+                  style={[
+                    styles.cityOption,
+                    orderData.senderCity === city.value && styles.selectedCity
+                  ]}
+                  onPress={() => handleCitySelect(city.value)}
+                >
+                  <Text style={styles.cityOptionLabel}>{city.label}</Text>
+                  <Text style={styles.cityOptionDescription}>{city.description}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
+
+        {/* Champ quartier */}
         <TextInput
           style={styles.input}
-          placeholder="Renseigner la provenance"
-          value={orderData.senderAddress}
-          onChangeText={(value) => handleOrderInputChange('senderAddress', value)}
+          placeholder="Quartier de provenance"
+          value={orderData.senderDistrict}
+          onChangeText={(value) => handleOrderInputChange('senderDistrict', value)}
         />
       </View>
 
@@ -331,13 +619,48 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           style={styles.phoneInput}
         />
         
-        <TextInput
-          style={styles.input}
-          placeholder="Adresse de livraison *"
-          value={orderData.deliveryAddress}
-          onChangeText={(value) => handleOrderInputChange('deliveryAddress', value)}
-          onFocus={handleGetCurrentLocation}
-        />
+        {/* Barre de recherche d'adresse */}
+        <View style={styles.searchBarContainer}>
+          <View style={styles.searchBar}>
+            <Text style={styles.searchIcon}>🔍</Text>
+            <TextInput
+              style={styles.searchInput}
+              placeholder="Où vous livrer ?"
+              value={orderData.deliveryAddress}
+              onChangeText={handleAddressInputChange}
+              onFocus={() => setIsTypingAddress(true)}
+              onBlur={() => {
+                setTimeout(() => {
+                  setIsTypingAddress(false);
+                  setShowAddressSuggestions(false);
+                }, 200);
+              }}
+            />
+            <View style={styles.separator} />
+            <TouchableOpacity 
+              style={styles.mapButton}
+              onPress={handleGetCurrentLocation}
+            >
+              <Text style={styles.mapButtonText}>Carte</Text>
+            </TouchableOpacity>
+          </View>
+          
+          {/* Suggestions d'adresses */}
+          {showAddressSuggestions && addressSuggestions.length > 0 && (
+            <View style={styles.suggestionsContainer}>
+              {addressSuggestions.map((suggestion, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.suggestionItem}
+                  onPress={() => handleAddressSuggestionSelect(suggestion)}
+                >
+                  <Text style={styles.suggestionIcon}>📍</Text>
+                  <Text style={styles.suggestionText}>{suggestion}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </View>
       </View>
 
       {/* Sélecteur de gare */}
@@ -474,6 +797,10 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         <Text style={styles.summaryTitle}>Informations générales</Text>
         <Text style={styles.summaryText}>Expéditeur: {orderData.senderName}</Text>
         <Text style={styles.summaryText}>Téléphone: {orderData.senderPhone}</Text>
+        <Text style={styles.summaryText}>Ville: {coteIvoireCities.find(city => city.value === orderData.senderCity)?.label}</Text>
+        {orderData.senderDistrict && (
+          <Text style={styles.summaryText}>Quartier: {orderData.senderDistrict}</Text>
+        )}
         <Text style={styles.summaryText}>Destinataire: {orderData.receiverName}</Text>
         <Text style={styles.summaryText}>Téléphone: {orderData.receiverPhone}</Text>
         <Text style={styles.summaryText}>Adresse: {orderData.deliveryAddress}</Text>
@@ -552,7 +879,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
@@ -759,6 +1085,122 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     lineHeight: 16,
+  },
+  citySelector: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 16,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    backgroundColor: COLORS.white,
+  },
+  citySelectorText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  cityOptions: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginBottom: 12,
+    maxHeight: 200,
+    overflow: 'hidden',
+  },
+  cityScrollView: {
+    maxHeight: 150,
+  },
+  cityOption: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  selectedCity: {
+    backgroundColor: COLORS.primary + '20',
+  },
+  cityOptionLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  cityOptionDescription: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    lineHeight: 16,
+  },
+  searchBarContainer: {
+    marginBottom: 16,
+  },
+  searchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  searchIcon: {
+    fontSize: 18,
+    color: '#666666',
+    marginRight: 12,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    backgroundColor: 'transparent',
+  },
+  separator: {
+    width: 1,
+    height: 20,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: 12,
+  },
+  mapButton: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  mapButtonText: {
+    fontSize: 16,
+    color: '#666666',
+    fontWeight: '500',
+  },
+  suggestionsContainer: {
+    backgroundColor: COLORS.white,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.lightGray,
+    maxHeight: 200,
+  },
+  suggestionItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  suggestionIcon: {
+    fontSize: 16,
+    marginRight: 12,
+    color: COLORS.primary,
+  },
+  suggestionText: {
+    flex: 1,
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    lineHeight: 18,
   },
   addToCartButton: {
     backgroundColor: COLORS.primary,

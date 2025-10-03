@@ -7,3 +7,7 @@ export { default as Checkbox } from './Checkbox';
 export { default as TrackingMap } from './TrackingMap';
 export { default as AppWrapper } from './AppWrapper';
 export { default as AnimatedModal } from './AnimatedModal';
+export { default as Header } from './Header';
+export { default as CustomHeader } from './CustomHeader';
+export { default as LogoutModal } from './LogoutModal';
+export { default as CancelPackageModal } from './CancelPackageModal';

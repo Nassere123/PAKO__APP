@@ -1,4 +1,4 @@
-import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import axios, { AxiosInstance, InternalAxiosRequestConfig, AxiosResponse } from 'axios';
 import { API_CONFIG } from '../constants';
 
 const API_BASE_URL = API_CONFIG.BASE_URL;
@@ -13,7 +13,7 @@ const api: AxiosInstance = axios.create({
 
 // Intercepteur pour ajouter le token d'authentification
 api.interceptors.request.use(
-  (config: AxiosRequestConfig) => {
+  (config: InternalAxiosRequestConfig) => {
     // Ajouter le token d'auth si disponible
     const token = 'your-auth-token'; // Récupérer depuis AsyncStorage
     if (token && config.headers) {
@@ -27,16 +27,16 @@ api.interceptors.request.use(
 );
 
 export const apiService = {
-  get: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => 
+  get: <T = any>(url: string, config?: InternalAxiosRequestConfig): Promise<AxiosResponse<T>> => 
     api.get<T>(url, config),
   
-  post: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => 
+  post: <T = any>(url: string, data?: any, config?: InternalAxiosRequestConfig): Promise<AxiosResponse<T>> => 
     api.post<T>(url, data, config),
   
-  put: <T = any>(url: string, data?: any, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => 
+  put: <T = any>(url: string, data?: any, config?: InternalAxiosRequestConfig): Promise<AxiosResponse<T>> => 
     api.put<T>(url, data, config),
   
-  delete: <T = any>(url: string, config?: AxiosRequestConfig): Promise<AxiosResponse<T>> => 
+  delete: <T = any>(url: string, config?: InternalAxiosRequestConfig): Promise<AxiosResponse<T>> => 
     api.delete<T>(url, config),
 };
 

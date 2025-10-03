@@ -1,14 +1,22 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
 import { ProfileScreenProps } from '../types';
 import { COLORS } from '../constants';
-import { useAuth } from '../hooks';
+import { useAuth, useProfilePhoto } from '../hooks';
+import { LogoutModal } from '../components';
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   const { user, logout } = useAuth();
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const { selectedImage, pickImage, isPicking } = useProfilePhoto();
 
-  const handleLogout = async (): Promise<void> => {
+  const handleLogoutPress = (): void => {
+    setShowLogoutModal(true);
+  };
+
+  const handleLogoutConfirm = async (): Promise<void> => {
     try {
+      setShowLogoutModal(false);
       await logout();
       navigation.reset({
         index: 0,
@@ -19,57 +27,44 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
+  const handleLogoutCancel = (): void => {
+    setShowLogoutModal(false);
+  };
+
   return (
     <View style={styles.container}>
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Section Mon Profil */}
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}></Text>
-          
           <View style={styles.profileCard}>
-            <View style={styles.profileImageContainer}>
+            <TouchableOpacity style={styles.profileImageContainer} onPress={pickImage} disabled={isPicking}>
               <View style={styles.profileImage}>
-                <Text style={styles.profileImageText}>👤</Text>
+                {selectedImage ? (
+                  <Image source={{ uri: selectedImage }} style={styles.profileImagePhoto} />
+                ) : (
+                  <Text style={styles.profileImageIcon}>📷</Text>
+                )}
+                <View style={styles.cameraIconOverlay}>
+                  <Text style={styles.cameraIcon}>{isPicking ? '...' : '+'}</Text>
+                </View>
               </View>
-              <TouchableOpacity style={styles.cameraButton}>
-                <Text style={styles.cameraIcon}>📷</Text>
-              </TouchableOpacity>
-            </View>
+            </TouchableOpacity>
             
             <View style={styles.profileInfo}>
               <Text style={styles.userName}>
                 {user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
               </Text>
-              <TouchableOpacity style={styles.editProfileButton}>
-                <Text style={styles.editProfileText}>Modifier le profil</Text>
-              </TouchableOpacity>
-              
-              <View style={styles.contactInfo}>
-                {user?.email && (
-                  <View style={styles.contactItem}>
-                    <Text style={styles.contactIcon}>📧</Text>
-                    <Text style={styles.contactText}>{user.email}</Text>
-                  </View>
-                )}
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactIcon}>📱</Text>
-                  <Text style={styles.contactText}>{user?.phone || 'Non défini'}</Text>
-                </View>
-                <View style={styles.contactItem}>
-                  <Text style={styles.contactIcon}>📍</Text>
-                  <Text style={styles.contactText}>{user?.address || 'Adresse non définie'}</Text>
-                </View>
-              </View>
+              {user?.email && (
+                <Text style={styles.userEmail}>{user.email}</Text>
+              )}
             </View>
           </View>
         </View>
 
+
         {/* Section Statistiques */}
         <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Statistiques</Text>
-            <Text style={styles.chartIcon}>📊</Text>
-          </View>
+          <Text style={styles.sectionTitle}>Statistiques</Text>
           
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
@@ -98,7 +93,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Actions */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>🔒</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>🔒</Text>
+            </View>
             <Text style={styles.actionText}>Changer votre mot de passe</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -107,13 +104,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Historique et Adresses */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>📋</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>📋</Text>
+            </View>
             <Text style={styles.actionText}>Historique des colis</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>📍</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>📍</Text>
+            </View>
             <Text style={styles.actionText}>Mes adresses</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -122,7 +123,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Paiement */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>💳</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>💳</Text>
+            </View>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionText}>Modes de paiement</Text>
               <Text style={styles.actionSubtext}>Espèces</Text>
@@ -131,7 +134,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>🎁</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>🎁</Text>
+            </View>
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionText}>Réductions et cadeaux</Text>
               <Text style={styles.actionSubtext}>Saisir un code promotionnel</Text>
@@ -143,13 +148,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Assistance */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>🎧</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>🎧</Text>
+            </View>
             <Text style={styles.actionText}>Assistance</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>ℹ️</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>ℹ️</Text>
+            </View>
             <Text style={styles.actionText}>Informations</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -158,13 +167,17 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Sécurité */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>🛡️</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>🛡️</Text>
+            </View>
             <Text style={styles.actionText}>Sécurité</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <Text style={styles.actionIcon}>⚙️</Text>
+            <View style={styles.actionIconContainer}>
+              <Text style={styles.actionIcon}>⚙️</Text>
+            </View>
             <Text style={styles.actionText}>Paramètres</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -174,12 +187,20 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.logoutButton}
-            onPress={handleLogout}
+            onPress={handleLogoutPress}
           >
             <Text style={styles.logoutText}>Se déconnecter</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
+
+      {/* Modal de confirmation de déconnexion */}
+      <LogoutModal
+        visible={showLogoutModal}
+        onConfirm={handleLogoutConfirm}
+        onCancel={handleLogoutCancel}
+        userName={user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
+      />
     </View>
   );
 };
@@ -187,38 +208,30 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
-    paddingTop: 40,
+    paddingTop: 20,
     paddingBottom: 20,
   },
   section: {
-    marginBottom: 16,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 20,
   },
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: '#000000',
     marginBottom: 12,
-  },
-  chartIcon: {
-    fontSize: 16,
-    marginLeft: 8,
+    marginLeft: 4,
   },
   profileCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
-    borderWidth: 1,
-    borderColor: COLORS.border,
+    flexDirection: 'row',
+    alignItems: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -229,108 +242,58 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   profileImageContainer: {
-    alignItems: 'center',
-    marginBottom: 20,
-    position: 'relative',
+    marginRight: 16,
   },
   profileImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: COLORS.lightGray,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#E9ECEF',
+    position: 'relative',
   },
-  profileImageText: {
-    fontSize: 40,
-    color: COLORS.textSecondary,
+  profileImageIcon: {
+    fontSize: 24,
+    color: '#6C757D',
   },
-  cameraButton: {
+  profileImagePhoto: {
+    width: 66,
+    height: 66,
+    borderRadius: 33,
+  },
+  cameraIconOverlay: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    bottom: -2,
+    right: -2,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 2,
+    borderColor: COLORS.white,
   },
   cameraIcon: {
     fontSize: 14,
+    color: COLORS.white,
+    fontWeight: 'bold',
   },
   profileInfo: {
-    alignItems: 'center',
+    flex: 1,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    marginBottom: 8,
-  },
-  editProfileButton: {
-    marginBottom: 16,
-  },
-  editProfileText: {
-    fontSize: 14,
-    color: COLORS.primary,
-    fontWeight: '500',
-  },
-  contactInfo: {
-    width: '100%',
-  },
-  contactItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  contactIcon: {
-    fontSize: 16,
-    marginRight: 12,
-    width: 20,
-  },
-  contactText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    flex: 1,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-  },
-  statCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    alignItems: 'center',
-    width: '48%',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 1,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 3,
-  },
-  statIcon: {
-    fontSize: 24,
-    marginBottom: 8,
-  },
-  statNumber: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    color: '#000000',
     marginBottom: 4,
   },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
+  userEmail: {
+    fontSize: 14,
+    color: '#666666',
   },
   actionItem: {
     backgroundColor: COLORS.white,
@@ -339,38 +302,88 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
       height: 1,
     },
-    shadowOpacity: 0.1,
+    shadowOpacity: 0.05,
     shadowRadius: 2,
-    elevation: 3,
+    elevation: 2,
+  },
+  actionIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#FFF3E0',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
   },
   actionIcon: {
-    fontSize: 20,
-    marginRight: 16,
-    width: 24,
+    fontSize: 18,
+    color: '#FF6B35',
   },
   actionText: {
     fontSize: 16,
-    color: COLORS.textPrimary,
+    color: '#000000',
     flex: 1,
+  },
+  actionArrow: {
+    fontSize: 18,
+    color: '#CCCCCC',
+    fontWeight: 'bold',
+  },
+  notificationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#FF0000',
+    marginRight: 8,
+  },
+  statsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  statCard: {
+    width: '48%',
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  statIcon: {
+    fontSize: 24,
+    marginBottom: 8,
+  },
+  statNumber: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 4,
+  },
+  statLabel: {
+    fontSize: 12,
+    color: '#666666',
+    textAlign: 'center',
   },
   actionTextContainer: {
     flex: 1,
   },
   actionSubtext: {
     fontSize: 12,
-    color: COLORS.textSecondary,
+    color: '#666666',
     marginTop: 2,
-  },
-  actionArrow: {
-    fontSize: 20,
-    color: COLORS.textSecondary,
   },
   logoutButton: {
     backgroundColor: COLORS.primary,

@@ -1,12 +1,97 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 
+interface HistoryItem {
+  id: string;
+  packageId: string;
+  date: string;
+  status: 'delivered' | 'in_transit' | 'pending';
+  destination: string;
+  description: string;
+}
+
 type MyPackagesScreenProps = StackScreenProps<RootStackParamList, 'MyPackages'>;
 
 const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
+  const [historyItems] = useState<HistoryItem[]>([
+    {
+      id: '1',
+      packageId: '#PAKO-2024-001',
+      date: '15 Jan 2024',
+      status: 'delivered',
+      destination: 'Gare du Nord',
+      description: 'Colis livré avec succès',
+    },
+    {
+      id: '2',
+      packageId: '#PAKO-2024-002',
+      date: '12 Jan 2024',
+      status: 'delivered',
+      destination: 'Gare de Lyon',
+      description: 'Colis récupéré par le destinataire',
+    },
+    {
+      id: '3',
+      packageId: '#PAKO-2024-003',
+      date: '10 Jan 2024',
+      status: 'delivered',
+      destination: 'Gare Montparnasse',
+      description: 'Livraison effectuée',
+    },
+    {
+      id: '4',
+      packageId: '#PAKO-2024-004',
+      date: '8 Jan 2024',
+      status: 'delivered',
+      destination: 'Gare Saint-Lazare',
+      description: 'Colis déposé à la gare',
+    },
+  ]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'delivered':
+        return COLORS.primary;
+      case 'in_transit':
+        return '#FFD700';
+      case 'pending':
+        return '#FF6B35';
+      default:
+        return COLORS.textSecondary;
+    }
+  };
+
+  const getStatusText = (status: string) => {
+    switch (status) {
+      case 'delivered':
+        return 'Livré';
+      case 'in_transit':
+        return 'En cours';
+      case 'pending':
+        return 'En attente';
+      default:
+        return status;
+    }
+  };
+
+  const renderHistoryItem = ({ item }: { item: HistoryItem }) => (
+    <TouchableOpacity style={styles.historyCard}>
+      <View style={styles.historyHeader}>
+        <Text style={styles.packageId}>{item.packageId}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status) }]}>
+          <Text style={styles.statusText}>{getStatusText(item.status)}</Text>
+        </View>
+      </View>
+      
+      <Text style={styles.destination}>📍 {item.destination}</Text>
+      <Text style={styles.description}>{item.description}</Text>
+      <Text style={styles.date}>{item.date}</Text>
+    </TouchableOpacity>
+  );
+
   const packageOptions = [
     {
       id: 'received',
@@ -37,11 +122,20 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Retour</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes colis</Text>
-        <View style={styles.headerSpacer} />
+        <View style={styles.headerContent}>
+          <View style={styles.titleContainer}>
+            <View style={styles.iconContainer}>
+              <Text style={styles.headerIcon}>📦</Text>
+            </View>
+            <View style={styles.titleTextContainer}>
+              <Text style={styles.headerTitle}>Mes réservations</Text>
+              <Text style={styles.headerSubtitle}>Gérez vos réservations</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.refreshButton}>
+            <Text style={styles.refreshIcon}>🔄</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
@@ -73,6 +167,19 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
           ))}
         </View>
 
+        {/* Section Historique */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Historique des colis</Text>
+          
+          <View style={styles.historyListContainer}>
+            {historyItems.map((item) => (
+              <View key={item.id}>
+                {renderHistoryItem({ item })}
+              </View>
+            ))}
+          </View>
+        </View>
+
         <View style={styles.helpSection}>
           <Text style={styles.helpTitle}>Besoin d'aide ?</Text>
           <Text style={styles.helpText}>
@@ -94,33 +201,69 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.white,
   },
   header: {
-    backgroundColor: '#2C3E50',
+    backgroundColor: COLORS.white,
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
+  },
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  backButton: {
+  titleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  iconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 15,
+  },
+  headerIcon: {
+    fontSize: 24,
     color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '500',
+  },
+  titleTextContainer: {
+    flex: 1,
   },
   headerTitle: {
-    color: COLORS.white,
-    fontSize: 18,
+    color: '#FF6B35',
+    fontSize: 20,
     fontWeight: 'bold',
+    marginBottom: 2,
   },
-  headerSpacer: {
-    width: 60,
+  headerSubtitle: {
+    color: '#000000',
+    fontSize: 14,
+    fontWeight: '400',
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  refreshIcon: {
+    fontSize: 18,
+    color: '#FF6B35',
   },
   content: {
     flex: 1,
     paddingHorizontal: 20,
+    paddingTop: 20,
   },
   welcomeSection: {
-    paddingVertical: 30,
+    paddingVertical: 20,
     alignItems: 'center',
   },
   welcomeTitle: {
@@ -225,6 +368,68 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 14,
     fontWeight: '600',
+  },
+  historyListContainer: {
+    paddingBottom: 10,
+  },
+  historyCard: {
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  historyHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  packageId: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+  },
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  destination: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginBottom: 4,
+  },
+  description: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  date: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+  },
+  section: {
+    marginBottom: 20,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#000000',
+    marginBottom: 12,
+    marginLeft: 4,
   },
 });
 
