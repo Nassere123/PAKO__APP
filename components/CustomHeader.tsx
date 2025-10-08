@@ -15,8 +15,13 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
   const { user, isConnected } = useAuth();
   const { selectedImage, pickImage, isPicking } = useProfilePhoto();
 
-  const getUserProfileIcon = () => {
-    return '📷'; // Icône de photo de profil
+  const getUserInitials = (): string => {
+    if (!user) return 'U';
+    const first = (user.firstName || '').trim();
+    const last = (user.lastName || '').trim();
+    const firstInitial = first ? first[0].toUpperCase() : '';
+    const lastInitial = last ? last[0].toUpperCase() : '';
+    return (firstInitial + lastInitial) || 'U';
   };
 
   const getAvatarColor = () => {
@@ -34,36 +39,12 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Avatar utilisateur */}
-      <TouchableOpacity 
-        style={styles.avatarContainer}
-        onPress={pickImage}
-        disabled={isPicking}
-      >
-        <View style={styles.avatar}>
-          {selectedImage ? (
-            <Image source={{ uri: selectedImage }} style={styles.avatarPhoto} />
-          ) : (
-            <Text style={styles.avatarIcon}>{getUserProfileIcon()}</Text>
-          )}
-          <View style={styles.cameraIconOverlay}>
-            <Text style={styles.cameraIcon}>{isPicking ? '...' : '+'}</Text>
-          </View>
-        </View>
-      </TouchableOpacity>
-
-      {/* Informations utilisateur */}
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>{getUserDisplayName()}</Text>
-        <Text style={styles.welcomeText}>Bonjour</Text>
-      </View>
-
       {/* Icône de notification */}
       <TouchableOpacity 
         style={styles.notificationContainer}
         onPress={onNotificationPress}
       >
-        <Text style={styles.bellIcon}>🔔</Text>
+        <Image source={require('../assets/notification.png')} style={styles.notificationIcon} resizeMode="contain" />
       </TouchableOpacity>
     </View>
   );
@@ -72,21 +53,20 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     flexDirection: 'row',
+    justifyContent: 'flex-end',
     alignItems: 'center',
     backgroundColor: COLORS.white,
     paddingHorizontal: 20,
-    paddingTop: 40, // Ajouter plus d'espace en haut
+    paddingTop: 10,
     paddingBottom: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E5E5',
   },
   avatarContainer: {
     marginRight: 16,
   },
   avatar: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
     backgroundColor: '#F8F9FA',
     justifyContent: 'center',
     alignItems: 'center',
@@ -102,33 +82,17 @@ const styles = StyleSheet.create({
     elevation: 5,
     position: 'relative',
   },
-  avatarIcon: {
+  avatarInitials: {
     fontSize: 18,
     color: '#6C757D',
+    fontWeight: '700',
   },
   avatarPhoto: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 54,
+    height: 54,
+    borderRadius: 27,
   },
-  cameraIconOverlay: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
-  },
-  cameraIcon: {
-    fontSize: 10,
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
+  // camera overlay removed
   userInfo: {
     flex: 1,
   },
@@ -144,12 +108,16 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   notificationContainer: {
-    marginLeft: 16,
     padding: 8,
   },
   bellIcon: {
     fontSize: 24,
     color: COLORS.primary, // Orange pour l'icône
+  },
+  notificationIcon: {
+    width: 24,
+    height: 24,
+    tintColor: COLORS.primary,
   },
 });
 

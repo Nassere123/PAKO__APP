@@ -35,7 +35,7 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
       Animated.sequence([
         // Animation de rebond
         Animated.timing(bounceAnim, {
-          toValue: -20,
+          toValue: -30,
           duration: 600,
           useNativeDriver: true,
         }),
@@ -57,8 +57,8 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
         }),
         // Animation de scale
         Animated.timing(scaleAnim, {
-          toValue: 1.2,
-          duration: 400,
+          toValue: 1.3,
+          duration: 350,
           useNativeDriver: true,
         }),
         Animated.timing(scaleAnim, {
@@ -124,7 +124,11 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
               },
             ]}
           >
-            <Text style={styles.checkmark}>✓</Text>
+            <Image 
+              source={require('../assets/check.png')} 
+              style={styles.checkmarkImage}
+              resizeMode="contain"
+            />
           </Animated.View>
         </View>
 
@@ -171,34 +175,28 @@ const styles = StyleSheet.create({
   },
   iconContainer: {
     alignItems: 'center',
-    marginTop: 40,
+    marginTop: 200,
   },
   successIcon: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: '#4CAF50',
+    // Show only the image without any circular background or shadow
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 50,
-    shadowColor: '#4CAF50',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+    marginBottom: -16,
   },
   checkmark: {
     fontSize: 40,
     color: COLORS.white,
     fontWeight: 'bold',
   },
+  checkmarkImage: {
+    width: 200,
+    height: 200,
+  },
   messageContainer: {
     alignItems: 'center',
     flex: 1,
     justifyContent: 'center',
+    marginTop: -20,
   },
   welcomeTitle: {
     fontSize: 32,

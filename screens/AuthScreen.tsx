@@ -111,12 +111,7 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
       >
         {/* Contenu principal centré */}
         <View style={styles.mainContent}>
-          {/* Icône principale */}
-          <Image 
-            source={require('../assets/salut.gif')} 
-            style={styles.iconImage}
-            resizeMode="contain"
-          />
+          {/* Icône principale retirée */}
 
           {/* Titre */}
           <Text style={styles.title}>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions, Image } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
@@ -42,12 +42,30 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
           loadedPackages = await PackageService.getUserPackages();
       }
       
+      // Si aucune donnée n'est trouvée, créer les données de test
+      if (loadedPackages.length === 0) {
+        await PackageService.createTestData();
+        // Recharger après création des données de test
+        switch (category) {
+          case 'received':
+            loadedPackages = await PackageService.getPackagesByStatus('delivered');
+            break;
+          case 'in_transit':
+            loadedPackages = await PackageService.getPackagesByStatus('in_transit');
+            break;
+          case 'cancelled':
+            loadedPackages = await PackageService.getPackagesByStatus('cancelled');
+            break;
+          default:
+            loadedPackages = await PackageService.getUserPackages();
+        }
+      }
+      
       setPackages(loadedPackages);
     } catch (error) {
       console.error('Erreur lors du chargement des colis:', error);
-      // Créer des données de test si aucune donnée n'est trouvée
-      await PackageService.createTestData();
-      loadPackages();
+      // En cas d'erreur, utiliser les données de test en mémoire
+      setPackages(packagesData[category] || []);
     }
   };
 
@@ -75,7 +93,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
     if (!packageToCancel) return;
     
     try {
-      // Essayer d'annuler via le service
+      // Annuler via le service (qui gère maintenant toutes les données)
       await PackageService.cancelPackage(packageToCancel.id);
       setShowCancelModal(false);
       setPackageToCancel(null);
@@ -84,17 +102,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
       Alert.alert('Succès', 'Le colis a été annulé avec succès.');
     } catch (error) {
       console.error('Erreur lors de l\'annulation:', error);
-      // Si c'est une erreur de service, simuler l'annulation pour les données de test
-      if (error instanceof Error && error.message?.includes('Colis non trouvé')) {
-        // Simuler l'annulation pour les données de test
-        setShowCancelModal(false);
-        setPackageToCancel(null);
-        Alert.alert('Succès', 'Le colis a été annulé avec succès.');
-        // Recharger les données
-        loadPackages();
-      } else {
-        Alert.alert('Erreur', 'Impossible d\'annuler ce colis.');
-      }
+      Alert.alert('Erreur', 'Impossible d\'annuler ce colis.');
     }
   };
 
@@ -185,26 +193,27 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
     ]
   };
 
-  // Utiliser les données du service ou les données de test en fallback
-  const displayPackages = packages.length > 0 ? packages : packagesData[category] || [];
+  // Utiliser les données du service (qui incluent maintenant les données de test sauvegardées)
+  const displayPackages = packages;
 
   const getCategoryInfo = () => {
     switch (category) {
       case 'received':
         return {
-          title: '📥 Colis reçus',
+          title: '✓ Colis reçus',
           subtitle: 'Colis livrés avec succès',
           color: '#4CAF50'
         };
       case 'in_transit':
         return {
-          title: '🚚 Colis en cours de livraison',
+          title: 'Colis en cours de livraison',
           subtitle: 'Colis actuellement en transit',
-          color: '#FF9800'
+          color: '#FF9800',
+          icon: 'itinerary'
         };
       case 'cancelled':
         return {
-          title: '❌ Colis annulés',
+          title: '🚫 Colis annulés',
           subtitle: 'Colis annulés ou retournés',
           color: '#F44336'
         };
@@ -266,7 +275,16 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.categoryHeader}>
-          <Text style={styles.categoryTitle}>{categoryInfo.title}</Text>
+          <View style={styles.categoryTitleContainer}>
+            {categoryInfo.icon && (
+              <Image 
+                source={require('../assets/itinerary.png')} 
+                style={styles.categoryIcon}
+                resizeMode="contain"
+              />
+            )}
+            <Text style={styles.categoryTitle}>{categoryInfo.title}</Text>
+          </View>
           <Text style={styles.categorySubtitle}>{categoryInfo.subtitle}</Text>
           <View style={[styles.categoryIndicator, { backgroundColor: categoryInfo.color }]} />
         </View>
@@ -284,7 +302,13 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                 <View style={styles.packageHeader}>
                   <Text style={styles.packageCode}>{pkg.trackingNumber}</Text>
                   <View style={[styles.statusBadge, { backgroundColor: categoryInfo.color }]}>
-                    <Text style={styles.statusText}>{pkg.status}</Text>
+                    <Text style={styles.statusText}>
+                      {pkg.status === 'delivered' ? 'Livré' : 
+                       pkg.status === 'in_transit' ? 'En cours' : 
+                       pkg.status === 'pending' ? 'En attente' : 
+                       pkg.status === 'cancelled' ? 'Annulé' : 
+                       pkg.status}
+                    </Text>
                   </View>
                 </View>
                 
@@ -314,7 +338,7 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                         style={styles.cancelButton}
                         onPress={() => handleCancelPackage(pkg)}
                       >
-                        <Text style={styles.cancelButtonText}>❌ Annuler</Text>
+                        <Text style={styles.cancelButtonText}>✗ Annuler</Text>
                       </TouchableOpacity>
                     )}
                   </View>
@@ -377,7 +401,13 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
                   
                   <View style={styles.detailRow}>
                     <Text style={styles.detailLabel}>Statut:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.status}</Text>
+                    <Text style={styles.detailValue}>
+                      {selectedPackage.status === 'delivered' ? 'Livré' : 
+                       selectedPackage.status === 'in_transit' ? 'En cours' : 
+                       selectedPackage.status === 'pending' ? 'En attente' : 
+                       selectedPackage.status === 'cancelled' ? 'Annulé' : 
+                       selectedPackage.status}
+                    </Text>
                   </View>
                   
                   <View style={styles.detailRow}>
@@ -498,18 +528,30 @@ const styles = StyleSheet.create({
     paddingVertical: 20,
     alignItems: 'center',
   },
+  categoryTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  categoryIcon: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
   categoryTitle: {
     fontSize: 22,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
-    marginBottom: 4,
     textAlign: 'center',
+    fontFamily: 'Rubik-Bold',
   },
   categorySubtitle: {
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
     marginBottom: 12,
+    fontFamily: 'Rubik-Regular',
   },
   categoryIndicator: {
     width: 40,
@@ -545,6 +587,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
+    fontFamily: 'Rubik-Bold',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -555,11 +598,13 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 12,
     fontWeight: '600',
+    fontFamily: 'Rubik-SemiBold',
   },
   packageDescription: {
     fontSize: 16,
     color: COLORS.textPrimary,
     marginBottom: 4,
+    fontFamily: 'Rubik-Regular',
   },
   packageType: {
     fontSize: 14,

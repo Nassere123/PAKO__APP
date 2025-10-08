@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
@@ -34,6 +34,8 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
   const { packageId } = route.params;
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [isTracking, setIsTracking] = useState(true);
+  const [showCallModal, setShowCallModal] = useState(false);
+  const slideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
 
   // Simulation de données de suivi
   const mockTrackingData: TrackingData = {
@@ -90,21 +92,32 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
     return () => clearInterval(interval);
   }, [isTracking, trackingData]);
 
+  const showCallModalPopup = () => {
+    setShowCallModal(true);
+    Animated.timing(slideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hideCallModal = () => {
+    Animated.timing(slideAnim, {
+      toValue: Dimensions.get('window').height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowCallModal(false);
+    });
+  };
+
   const handleCallDriver = () => {
-    Alert.alert(
-      "Appeler le livreur",
-      `Voulez-vous appeler ${trackingData?.driver.name} ?`,
-      [
-        { text: "Annuler", style: "cancel" },
-        { 
-          text: "Appeler", 
-          onPress: () => {
-            // Ici vous pourriez intégrer un système d'appel
-            Alert.alert("Appel", `Appel vers ${trackingData?.driver.phone}`);
-          }
-        }
-      ]
-    );
+    showCallModalPopup();
+  };
+
+  const confirmCall = () => {
+    hideCallModal();
+    Alert.alert("Appel", `Appel vers ${trackingData?.driver.phone}`);
   };
 
 
@@ -230,6 +243,59 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
         {/* Actions */}
         {renderTrackingActions()}
       </ScrollView>
+
+      {/* Modal pour l'appel du livreur */}
+      <Modal
+        visible={showCallModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={hideCallModal}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity 
+            style={styles.modalBackdrop} 
+            activeOpacity={1} 
+            onPress={hideCallModal}
+          />
+          <Animated.View 
+            style={[
+              styles.modalContainer,
+              {
+                transform: [{ translateY: slideAnim }]
+              }
+            ]}
+          >
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>📞 Appeler le livreur</Text>
+            </View>
+            
+            <View style={styles.modalContent}>
+              <Text style={styles.modalMessage}>
+                Voulez-vous appeler {trackingData?.driver.name} ?
+              </Text>
+              <Text style={styles.modalPhone}>
+                📱 {trackingData?.driver.phone}
+              </Text>
+            </View>
+            
+            <View style={styles.modalActions}>
+              <TouchableOpacity 
+                style={styles.modalCancelButton}
+                onPress={hideCallModal}
+              >
+                <Text style={styles.modalCancelButtonText}>Annuler</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.modalCallButton}
+                onPress={confirmCall}
+              >
+                <Text style={styles.modalCallButtonText}>📞 Appeler</Text>
+              </TouchableOpacity>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -505,6 +571,82 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     flex: 1,
     textAlign: 'right',
+  },
+  // Styles pour le modal d'appel
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  modalBackdrop: {
+    flex: 1,
+  },
+  modalContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 40,
+    maxHeight: '50%',
+  },
+  modalHeader: {
+    marginBottom: 20,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+  },
+  modalContent: {
+    marginBottom: 30,
+    alignItems: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 22,
+  },
+  modalPhone: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    textAlign: 'center',
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: 12,
+  },
+  modalCancelButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  modalCancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  modalCallButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  modalCallButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
   },
 });
 

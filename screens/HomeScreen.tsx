@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Animated, Modal } from 'react-native';
 import { HomeScreenProps } from '../types';
 import { COLORS } from '../constants';
+import OSMSearchMap from '../components/OSMSearchMap';
 import { CustomHeader } from '../components';
 
 interface HistoryItem {
@@ -134,19 +135,33 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   const renderHomeContent = () => (
     <View style={styles.content}>
+      {/* Header avec logo PAKO et position */}
+      <View style={styles.homeHeader}>
+        <View style={styles.logoContainer}>
+          <Text style={styles.logoText}>PAKO</Text>
+          <TouchableOpacity style={styles.locationContainer}>
+            <Text style={styles.locationText}>Votre position</Text>
+            <Text style={styles.locationArrow}>›</Text>
+          </TouchableOpacity>
+        </View>
+        <View style={styles.rightButtonsContainer}>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Image source={require('../assets/notification.png')} style={styles.notificationIcon} resizeMode="contain" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Boutons d'action principaux */}
       <View style={styles.actionButtons}>
         <TouchableOpacity 
           style={[styles.actionButton, styles.primaryActionButton]}
           onPress={() => navigation.navigate('MultiStepPackageRegistration' as any)}
         >
-          <Text style={styles.actionButtonIcon}>📦</Text>
           <View style={styles.actionButtonContent}>
             <Text style={styles.primaryActionButtonText}>Recevoir mon colis</Text>
             <Text style={styles.actionButtonSubtext}>Livraison à domicile</Text>
           </View>
         </TouchableOpacity>
-
       </View>
 
     </View>
@@ -156,9 +171,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     <View style={[styles.content, (isRefreshing || isLoading) && styles.contentLoading]}>
       <View style={styles.packagesHeader}>
         <View style={styles.packagesTitleContainer}>
-          <View style={styles.packagesIconContainer}>
-            <Text style={styles.packagesIcon}>📦</Text>
-          </View>
           <Text style={styles.packagesTitle}>Mes colis enregistrés</Text>
         </View>
         <TouchableOpacity 
@@ -166,7 +178,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           disabled={isRefreshing || isLoading}
           style={[styles.refreshButton, (isRefreshing || isLoading) && styles.refreshButtonDisabled]}
         >
-          <Animated.Text 
+          <Animated.Image 
+            source={require('../assets/refresh.png')}
             style={[
               styles.refreshIcon, 
               {
@@ -178,9 +191,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                 }]
               }
             ]}
-          >
-            🔄
-          </Animated.Text>
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       </View>
       
@@ -210,7 +222,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <View style={styles.optionContent}>
               <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>📥 Colis reçus</Text>
+                <View style={styles.optionTitleContainer}>
+                  <Text style={styles.optionIcon}>✓</Text>
+                  <Text style={styles.optionTitle}>Colis reçus</Text>
+                </View>
                 <Text style={styles.optionDescription}>Colis livrés avec succès</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#4CAF50' }]}>
@@ -234,7 +249,14 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <View style={styles.optionContent}>
               <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>🚚 Colis en cours</Text>
+                <View style={styles.optionTitleContainer}>
+                  <Image 
+                    source={require('../assets/itinerary.png')} 
+                    style={styles.optionIconImage}
+                    resizeMode="contain"
+                  />
+                  <Text style={styles.optionTitle}>Colis en cours</Text>
+                </View>
                 <Text style={styles.optionDescription}>Colis en transit</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#FF9800' }]}>
@@ -261,7 +283,10 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           >
             <View style={styles.optionContent}>
               <View style={styles.optionTextContainer}>
-                <Text style={styles.optionTitle}>❌ Colis annulés</Text>
+                <View style={styles.optionTitleContainer}>
+                  <Text style={styles.optionIcon}>🚫</Text>
+                  <Text style={styles.optionTitle}>Colis annulés</Text>
+                </View>
                 <Text style={styles.optionDescription}>Colis annulés ou retournés</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#F44336' }]}>
@@ -301,15 +326,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      {/* Header personnalisé - affiché seulement sur l'onglet Accueil */}
-      {activeTab === 'home' && (
-        <CustomHeader 
-          onProfilePress={() => navigation.navigate('Profile')}
-          onNotificationPress={() => {
-            console.log('Notifications pressed');
-          }}
-        />
-      )}
       
       {renderContent()}
 
@@ -319,7 +335,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPress={() => setActiveTab('home')}
         >
           <Image 
-            source={require('../assets/maison.png')} 
+            source={require('../assets/home (1).png')} 
             style={[styles.navIconHome, activeTab === 'home' && styles.activeNavIcon]} 
             resizeMode="contain"
           />
@@ -331,9 +347,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPress={() => setActiveTab('packages')}
         >
             <Image 
-              source={require('../assets/paquet.gif')} 
+              source={require('../assets/boxes.png')} 
               style={[styles.navIcon, activeTab === 'packages' && styles.activeNavIcon]} 
-              resizeMode="contain"
+              resizeMode="cover"
             />
           <Text style={[styles.navLabel, activeTab === 'packages' && styles.activeNavLabel]}>Mes colis</Text>
         </TouchableOpacity>
@@ -343,9 +359,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPress={() => navigation.navigate('Profile' as any)}
         >
           <Image 
-            source={require('../assets/profil.gif')} 
-            style={styles.navIconHome} 
-            resizeMode="contain"
+            source={require('../assets/user (2).png')} 
+            style={[styles.navIconHome, { opacity: 0.6 }]} 
+            resizeMode="cover"
           />
           <Text style={styles.navLabel}>Profil</Text>
         </TouchableOpacity>
@@ -359,7 +375,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       >
         <View style={styles.loadingOverlay}>
           <View style={styles.loadingContainer}>
-            <Animated.Text 
+            <Animated.Image 
+              source={require('../assets/refresh.png')}
               style={[
                 styles.loadingIcon,
                 {
@@ -371,9 +388,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                   }]
                 }
               ]}
-            >
-              🔄
-            </Animated.Text>
+              resizeMode="contain"
+            />
             <Text style={styles.loadingTitle}>Actualisation en cours...</Text>
             <Text style={styles.loadingSubtitle}>Chargement de vos colis</Text>
           </View>
@@ -439,20 +455,11 @@ const styles = StyleSheet.create({
   actionButton: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
-    padding: 12,
+    padding: 16,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    minHeight: 60,
   },
   primaryActionButton: {
     backgroundColor: COLORS.primary,
@@ -460,6 +467,11 @@ const styles = StyleSheet.create({
   },
   actionButtonContent: {
     alignItems: 'center',
+    flex: 1,
+  },
+  actionButtonImage: {
+    width: 48,
+    height: 48,
   },
   actionButtonIcon: {
     fontSize: 24,
@@ -633,17 +645,18 @@ const styles = StyleSheet.create({
     // Style pour l'élément actif
   },
   navIcon: {
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     marginBottom: 4,
-    opacity: 0.6,
+    opacity: 1,
     alignSelf: 'center',
+    backgroundColor: 'transparent',
   },
   navIconHome: {
     width: 32,
     height: 32,
     marginBottom: 4,
-    opacity: 0.6,
+    opacity: 1,
     alignSelf: 'center',
   },
   activeNavIcon: {
@@ -653,10 +666,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: COLORS.textSecondary,
     fontWeight: '500',
+    fontFamily: 'Rubik-Regular',
   },
   activeNavLabel: {
     color: COLORS.primary,
     fontWeight: '600',
+    fontFamily: 'Rubik-SemiBold',
   },
   packagesHeader: {
     flexDirection: 'row',
@@ -697,8 +712,9 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   refreshIcon: {
-    fontSize: 26,
-    color: '#FF6B35',
+    width: 26,
+    height: 26,
+    tintColor: COLORS.textSecondary,
   },
   loadingOverlay: {
     flex: 1,
@@ -722,8 +738,10 @@ const styles = StyleSheet.create({
     minWidth: 200,
   },
   loadingIcon: {
-    fontSize: 48,
+    width: 48,
+    height: 48,
     marginBottom: 20,
+    tintColor: '#FF6B35',
   },
   loadingTitle: {
     fontSize: 18,
@@ -847,6 +865,22 @@ const styles = StyleSheet.create({
   optionTextContainer: {
     flex: 1,
   },
+  optionTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  optionIcon: {
+    fontSize: 18,
+    marginRight: 8,
+    fontWeight: 'bold',
+    fontFamily: 'Rubik-Bold',
+  },
+  optionIconImage: {
+    width: 24,
+    height: 24,
+    marginRight: 8,
+  },
   optionTitle: {
     fontSize: 16,
     fontWeight: 'bold',
@@ -854,10 +888,12 @@ const styles = StyleSheet.create({
     marginBottom: 4,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    fontFamily: 'Rubik-Bold',
   },
   optionDescription: {
     fontSize: 14,
     color: COLORS.textSecondary,
+    fontFamily: 'Rubik-Regular',
   },
   countBadge: {
     width: 30,
@@ -871,6 +907,7 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
     color: COLORS.white,
+    fontFamily: 'Rubik-Bold',
   },
   optionArrow: {
     fontSize: 18,
@@ -927,6 +964,7 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: COLORS.textPrimary,
     marginBottom: 8,
+    textAlign: 'center',
   },
   welcomeSubtitle: {
     fontSize: 16,
@@ -966,6 +1004,76 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     textAlign: 'center',
+  },
+  // Styles pour le header PAKO
+  homeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 20,
+    paddingBottom: 15,
+    backgroundColor: COLORS.white,
+  },
+  logoContainer: {
+    flex: 1,
+  },
+  logoText: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    fontFamily: 'Rubik-Bold',
+    letterSpacing: 1,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+    fontFamily: 'Rubik-Regular',
+  },
+  locationArrow: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    marginLeft: 4,
+  },
+  rightButtonsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  notificationButton: {
+    padding: 8,
+    marginLeft: 8,
+  },
+  notificationIcon: {
+    width: 24,
+    height: 24,
+    tintColor: COLORS.primary,
+  },
+  imageContainer: {
+    width: '100%',
+    height: 400,
+    position: 'relative',
+    borderRadius: 0,
+    overflow: 'hidden',
+    marginBottom: 0,
+  },
+  welcomeImage: {
+    width: '100%',
+    height: '100%',
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    padding: 20,
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
   },
 });
 

@@ -98,7 +98,7 @@ const ForgotPasswordScreen: React.FC<ForgotPasswordScreenProps> = ({ navigation 
         </TouchableOpacity>
                <View style={styles.headerContent}>
                  <Image
-                   source={require('../assets/8bedea66-f318-404b-8ffd-73beacaa06c5.png')}
+                   source={require('../assets/PAKO APP.png')}
                    style={styles.logoImage}
                    resizeMode="contain"
                  />

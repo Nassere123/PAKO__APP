@@ -105,89 +105,17 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
     <View style={styles.container}>
       <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
       
-      {/* Fond orange uni */}
-      <View style={styles.background} />
-
-      {/* Contenu principal */}
-      <Animated.View
-        style={[
-          styles.content,
-          {
-            opacity: fadeAnim,
-            transform: [
-              { scale: scaleAnim },
-              { translateY: slideAnim },
-            ],
-          },
-        ]}
-      >
-        {/* Logo principal */}
-        <Animated.View
-          style={[
-            styles.logoContainer,
-            {
-              transform: [
-                { rotate: logoRotation },
-                { scale: pulseAnim },
-              ],
-            },
-          ]}
-        >
-          <Image
-            source={require('../assets/8bedea66-f318-404b-8ffd-73beacaa06c5.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </Animated.View>
-
-        {/* Titre de l'application */}
-        <Animated.Text
-          style={[
-            styles.title,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          PAKO
-        </Animated.Text>
-
-        {/* Sous-titre */}
-        <Animated.Text
-          style={[
-            styles.subtitle,
-            {
-              opacity: fadeAnim,
-              transform: [{ translateY: slideAnim }],
-            },
-          ]}
-        >
-          Livraison rapide et fiable
-        </Animated.Text>
-
-        {/* Indicateur de chargement */}
-        <View style={styles.loadingContainer}>
-          <View style={styles.loadingDots}>
-            <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
-            <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
-            <Animated.View style={[styles.dot, { opacity: pulseAnim }]} />
-          </View>
-          <Text style={styles.loadingText}>Chargement...</Text>
-        </View>
-      </Animated.View>
-
-      {/* Version */}
-      <Animated.Text
-        style={[
-          styles.version,
-          {
-            opacity: fadeAnim,
-          },
-        ]}
-      >
-        Version 1.0.0
-      </Animated.Text>
+      {/* Fond image Light Orange + logo */}
+      <Image
+        source={require('../assets/Light Orange.jpg')}
+        style={styles.backgroundImage}
+        resizeMode="cover"
+      />
+      <Image
+        source={require('../assets/PAKO APP.png')}
+        style={styles.logoImage}
+        resizeMode="contain"
+      />
     </View>
   );
 };
@@ -224,8 +152,18 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   logoImage: {
-    width: 150,
-    height: 80,
+    width: 280,
+    height: 280,
+    backgroundColor: 'transparent',
+  },
+  backgroundImage: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    width: '100%',
+    height: '100%',
   },
   title: {
     fontSize: 48,

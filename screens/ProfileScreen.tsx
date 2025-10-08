@@ -1,23 +1,54 @@
+// ============================================================================
+// IMPORTATIONS
+// ============================================================================
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { ProfileScreenProps } from '../types';
 import { COLORS } from '../constants';
-import { useAuth, useProfilePhoto } from '../hooks';
+import { useAuth } from '../hooks';
 import { LogoutModal } from '../components';
 
-const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
-  const { user, logout } = useAuth();
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
-  const { selectedImage, pickImage, isPicking } = useProfilePhoto();
+// ============================================================================
+// COMPOSANT PRINCIPAL
+// ============================================================================
 
+/**
+ * Écran de profil utilisateur
+ * Affiche les informations personnelles, statistiques et options de compte
+ */
+const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
+  
+  // ============================================================================
+  // HOOKS ET ÉTAT LOCAL
+  // ============================================================================
+  
+  /** Hook d'authentification pour récupérer les données utilisateur */
+  const { user, logout } = useAuth();
+  
+  /** État pour contrôler l'affichage du modal de déconnexion */
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  
+
+  // ============================================================================
+  // GESTIONNAIRES D'ÉVÉNEMENTS
+  // ============================================================================
+  
+  /**
+   * Affiche le modal de confirmation de déconnexion
+   */
   const handleLogoutPress = (): void => {
     setShowLogoutModal(true);
   };
 
+  /**
+   * Confirme et exécute la déconnexion de l'utilisateur
+   * Redirige vers l'écran d'authentification après déconnexion
+   */
   const handleLogoutConfirm = async (): Promise<void> => {
     try {
       setShowLogoutModal(false);
       await logout();
+      // Réinitialise la pile de navigation pour éviter le retour
       navigation.reset({
         index: 0,
         routes: [{ name: 'Auth' }],
@@ -27,33 +58,35 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
     }
   };
 
+  /**
+   * Annule la déconnexion et ferme le modal
+   */
   const handleLogoutCancel = (): void => {
     setShowLogoutModal(false);
   };
 
+  // ============================================================================
+  // RENDU PRINCIPAL
+  // ============================================================================
+  
   return (
     <View style={styles.container}>
+      {/* Contenu scrollable de l'écran de profil */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Section Mon Profil */}
+        {/* Section principale du profil utilisateur */}
         <View style={styles.section}>
           <View style={styles.profileCard}>
-            <TouchableOpacity style={styles.profileImageContainer} onPress={pickImage} disabled={isPicking}>
-              <View style={styles.profileImage}>
-                {selectedImage ? (
-                  <Image source={{ uri: selectedImage }} style={styles.profileImagePhoto} />
-                ) : (
-                  <Text style={styles.profileImageIcon}>📷</Text>
-                )}
-                <View style={styles.cameraIconOverlay}>
-                  <Text style={styles.cameraIcon}>{isPicking ? '...' : '+'}</Text>
+            <View style={styles.profileInfo}>
+              <View style={styles.userNameContainer}>
+                <Text style={styles.userName}>
+                  {user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
+                </Text>
+                <View style={styles.userInitialsContainer}>
+                  <Text style={styles.userInitials}>
+                    {user ? `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}` : 'U'}
+                  </Text>
                 </View>
               </View>
-            </TouchableOpacity>
-            
-            <View style={styles.profileInfo}>
-              <Text style={styles.userName}>
-                {user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
-              </Text>
               {user?.email && (
                 <Text style={styles.userEmail}>{user.email}</Text>
               )}
@@ -183,7 +216,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Section Déconnexion */}
+        {/* Section de déconnexion avec bouton principal */}
         <View style={styles.section}>
           <TouchableOpacity 
             style={styles.logoutButton}
@@ -205,6 +238,14 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   );
 };
 
+// ============================================================================
+// STYLES
+// ============================================================================
+
+/**
+ * Définition de tous les styles utilisés dans le composant ProfileScreen
+ * Organisés par sections : container, profile, actions, modals, etc.
+ */
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -241,55 +282,33 @@ const styles = StyleSheet.create({
     shadowRadius: 3.84,
     elevation: 5,
   },
-  profileImageContainer: {
-    marginRight: 16,
-  },
-  profileImage: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#F8F9FA',
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: '#E9ECEF',
-    position: 'relative',
-  },
-  profileImageIcon: {
-    fontSize: 24,
-    color: '#6C757D',
-  },
-  profileImagePhoto: {
-    width: 66,
-    height: 66,
-    borderRadius: 33,
-  },
-  cameraIconOverlay: {
-    position: 'absolute',
-    bottom: -2,
-    right: -2,
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    backgroundColor: COLORS.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 2,
-    borderColor: COLORS.white,
-  },
-  cameraIcon: {
-    fontSize: 14,
-    color: COLORS.white,
-    fontWeight: 'bold',
-  },
   profileInfo: {
     flex: 1,
+  },
+  userNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
   },
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
     color: '#000000',
-    marginBottom: 4,
+    flex: 1,
+  },
+  userInitialsContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 12,
+  },
+  userInitials: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
   },
   userEmail: {
     fontSize: 14,
@@ -400,4 +419,12 @@ const styles = StyleSheet.create({
   },
 });
 
+// ============================================================================
+// EXPORT DU COMPOSANT
+// ============================================================================
+
+/**
+ * Export du composant ProfileScreen comme export par défaut
+ * Ce composant peut être utilisé dans la navigation de l'application
+ */
 export default ProfileScreen;

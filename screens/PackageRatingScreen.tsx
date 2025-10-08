@@ -1,3 +1,6 @@
+// ============================================================================
+// IMPORTATIONS
+// ============================================================================
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
@@ -5,27 +8,76 @@ import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import { AnimatedModal } from '../components';
 
+// ============================================================================
+// TYPES ET INTERFACES
+// ============================================================================
+
+/**
+ * Type pour les props du composant PackageRatingScreen
+ * Définit la navigation et les paramètres reçus (packageId, packageData)
+ */
 type PackageRatingScreenProps = StackScreenProps<RootStackParamList, 'PackageRating'>;
 
 
+// ============================================================================
+// COMPOSANT PRINCIPAL
+// ============================================================================
+
+/**
+ * Écran d'évaluation des colis
+ * Permet aux utilisateurs de noter et commenter leurs colis après livraison
+ */
 const PackageRatingScreen: React.FC<PackageRatingScreenProps> = ({ navigation, route }) => {
+  
+  // ============================================================================
+  // EXTRACTION DES PARAMÈTRES
+  // ============================================================================
+  
+  /** Extraction des paramètres passés par la navigation */
   const { packageId, packageData } = route.params as { 
-    packageId: string; 
-    packageData: any 
+    packageId: string;    // Identifiant unique du colis
+    packageData: any      // Données complètes du colis
   };
 
+  // ============================================================================
+  // ÉTAT LOCAL (STATE)
+  // ============================================================================
+  
+  /** Note globale attribuée au colis (0-5 étoiles) */
   const [overallRating, setOverallRating] = useState(0);
+  
+  /** Commentaire libre de l'utilisateur */
   const [comment, setComment] = useState('');
+  
+  /** Contrôle l'affichage du modal de succès après soumission */
   const [showSuccessModal, setShowSuccessModal] = useState(false);
 
+  // ============================================================================
+  // GESTIONNAIRES D'ÉVÉNEMENTS
+  // ============================================================================
+  
+  /**
+   * Met à jour la note globale attribuée au colis
+   * @param rating - Note entre 0 et 5
+   */
   const handleOverallRating = (rating: number) => {
     setOverallRating(rating);
   };
 
-
+  // ============================================================================
+  // FONCTIONS DE RENDU
+  // ============================================================================
+  
+  /**
+   * Génère et affiche les étoiles de notation
+   * @param rating - Note actuelle (0-5)
+   * @param onPress - Fonction appelée lors du clic sur une étoile
+   * @returns Composant d'étoiles interactives
+   */
   const renderStars = (rating: number, onPress: (rating: number) => void) => {
     const stars = [];
     
+    // Génération de 5 étoiles (pleines ou vides selon la note)
     for (let i = 1; i <= 5; i++) {
       stars.push(
         <TouchableOpacity
@@ -34,7 +86,7 @@ const PackageRatingScreen: React.FC<PackageRatingScreenProps> = ({ navigation, r
           style={styles.starButton}
         >
           <Text style={[styles.star, { fontSize: 32 }]}>
-            {i <= rating ? '⭐' : '☆'}
+            {i <= rating ? '⭐' : '☆'}  {/* Étoile pleine si i <= rating, vide sinon */}
           </Text>
         </TouchableOpacity>
       );
@@ -43,12 +95,17 @@ const PackageRatingScreen: React.FC<PackageRatingScreenProps> = ({ navigation, r
     return <View style={styles.starsContainer}>{stars}</View>;
   };
 
+  /**
+   * Valide et soumet l'évaluation du colis
+   * Vérifie qu'une note globale a été attribuée avant de soumettre
+   */
   const handleSubmitRating = () => {
     if (overallRating === 0) {
       Alert.alert('Erreur', 'Veuillez donner une note globale au service');
       return;
     }
     
+    // TODO: Remplacer par un appel API réel
     // Sauvegarder l'évaluation
     console.log('Évaluation sauvegardée:', {
       packageId,
@@ -60,11 +117,19 @@ const PackageRatingScreen: React.FC<PackageRatingScreenProps> = ({ navigation, r
     setShowSuccessModal(true);
   };
 
+  /**
+   * Ferme le modal de succès et retourne à l'écran précédent
+   */
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
     navigation.goBack();
   };
 
+  /**
+   * Retourne le texte descriptif correspondant à une note
+   * @param rating - Note entre 1 et 5
+   * @returns Texte descriptif en français
+   */
   const getRatingText = (rating: number) => {
     switch (rating) {
       case 1: return 'Très décevant';
@@ -76,8 +141,13 @@ const PackageRatingScreen: React.FC<PackageRatingScreenProps> = ({ navigation, r
     }
   };
 
+  // ============================================================================
+  // RENDU PRINCIPAL
+  // ============================================================================
+  
   return (
     <View style={styles.container}>
+      {/* En-tête avec bouton retour et titre */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Text style={styles.backButton}>← Retour</Text>
@@ -314,5 +384,13 @@ const styles = StyleSheet.create({
   },
 });
 
+// ============================================================================
+// EXPORT DU COMPOSANT
+// ============================================================================
+
+/**
+ * Export du composant PackageRatingScreen comme export par défaut
+ * Ce composant peut être utilisé dans la navigation de l'application
+ */
 export default PackageRatingScreen;
 

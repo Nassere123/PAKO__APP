@@ -26,8 +26,13 @@ const Header: React.FC<HeaderProps> = ({
     return 'Bonsoir';
   };
 
-  const getUserProfileIcon = () => {
-    return '📷'; // Icône de photo de profil
+  const getUserInitials = (): string => {
+    if (!user) return 'U';
+    const first = (user.firstName || '').trim();
+    const last = (user.lastName || '').trim();
+    const firstInitial = first ? first[0].toUpperCase() : '';
+    const lastInitial = last ? last[0].toUpperCase() : '';
+    return (firstInitial + lastInitial) || 'U';
   };
 
   const getUserDisplayName = () => {
@@ -68,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({
               style={styles.iconButton}
               onPress={onNotificationPress}
             >
-              <Text style={styles.iconText}>🔔</Text>
+              <Image source={require('../assets/notification.png')} style={styles.notificationIcon} resizeMode="contain" />
               <View style={styles.notificationBadge}>
                 <Text style={styles.badgeText}>3</Text>
               </View>
@@ -84,7 +89,7 @@ const Header: React.FC<HeaderProps> = ({
                   {selectedImage ? (
                     <Image source={{ uri: selectedImage }} style={styles.avatarPhoto} />
                   ) : (
-                    <Text style={styles.avatarIcon}>{getUserProfileIcon()}</Text>
+                    <Text style={styles.avatarInitials}>{getUserInitials()}</Text>
                   )}
                 </View>
                 {isConnected && (
@@ -157,6 +162,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: 'bold',
   },
+  appLogo: {
+    width: 90,
+    height: 28,
+  },
   header: {
     paddingHorizontal: 20,
     paddingBottom: 20,
@@ -194,6 +203,11 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: COLORS.white,
   },
+  notificationIcon: {
+    width: 22,
+    height: 22,
+    tintColor: COLORS.white,
+  },
   notificationBadge: {
     position: 'absolute',
     top: 4,
@@ -214,22 +228,24 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  avatarIcon: {
-    fontSize: 20,
+  avatarInitials: {
+    fontSize: 16,
+    color: COLORS.white,
+    fontWeight: '700',
   },
   avatarPhoto: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
   },
   onlineIndicator: {
     position: 'absolute',
