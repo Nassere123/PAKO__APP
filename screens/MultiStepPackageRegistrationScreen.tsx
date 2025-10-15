@@ -13,13 +13,19 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
+  KeyboardAvoidingView,
+  Keyboard,
 } from 'react-native';
+import * as Contacts from 'expo-contacts';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
 import PhoneInput from '../components/PhoneInput';
 import OSMSearchMap from '../components/OSMSearchMap';
 import { PricingCalculator, PricingResult } from '../utils/pricingCalculator';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { OrderService } from '../services/orderService';
 
 type MultiStepPackageRegistrationScreenProps = StackScreenProps<RootStackParamList, 'MultiStepPackageRegistration'>;
 
@@ -27,7 +33,6 @@ interface PackageData {
   packageCode: string;
   packageDescription: string;
   packageType: string;
-  estimatedValue: string;
   specialInstructions: string;
 }
 
@@ -45,7 +50,11 @@ interface OrderData {
   stationLatitude?: number;
   stationLongitude?: number;
   distanceKm?: number;
+  deliveryType?: 'standard' | 'express';
+  packageCode?: string;
   packages: PackageData[];
+  selectedRecipientPhone: string;
+  selectedRecipientName: string;
 }
 
 const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationScreenProps> = ({ navigation }) => {
@@ -61,12 +70,19 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       case 1:
         return orderData.senderName && orderData.senderPhone && orderData.senderCity && 
                orderData.receiverName && orderData.receiverPhone && orderData.deliveryAddress && 
-               orderData.destinationStation;
+               orderData.destinationStation && orderData.selectedRecipientPhone;
       case 2:
         return orderData.packages.length > 0;
       default:
         return true;
     }
+  };
+  
+  const removePackage = (index: number) => {
+    setOrderData(prev => ({
+      ...prev,
+      packages: prev.packages.filter((_, i) => i !== index)
+    }));
   };
   
   const packageTypes = [
@@ -82,16 +98,52 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
   ];
 
   const partnerStations = [
-    { value: 'gare_nord', label: 'Gare du Nord', description: 'Abidjan - Gare principale' },
-    { value: 'gare_lyon', label: 'Gare de Lyon', description: 'Abidjan - Plateau' },
-    { value: 'gare_ouest', label: 'Gare de l\'Ouest', description: 'Abidjan - Yopougon' },
-    { value: 'gare_sud', label: 'Gare du Sud', description: 'Abidjan - Marcory' },
-    { value: 'gare_est', label: 'Gare de l\'Est', description: 'Abidjan - Cocody' },
-    { value: 'gare_bouake', label: 'Gare de Bouaké', description: 'Bouaké - Centre ville' },
-    { value: 'gare_san_pedro', label: 'Gare de San-Pédro', description: 'San-Pédro - Port' },
-    { value: 'gare_korhogo', label: 'Gare de Korhogo', description: 'Korhogo - Nord' },
-    { value: 'gare_man', label: 'Gare de Man', description: 'Man - Ouest' },
-    { value: 'gare_daloa', label: 'Gare de Daloa', description: 'Daloa - Centre-Ouest' },
+    { value: 'sbta_adjame', label: 'SBTA - Adjame', description: 'Adjame - Gare principale interurbaine' },
+    { value: 'utb_cocody', label: 'UTB - Cocody', description: 'Cocody - Gare UTB' },
+    { value: 'alino_yopougon', label: 'Alino - Yopougon', description: 'Yopougon - Gare Alino' },
+    { value: 'sbta_marcory', label: 'SBTA - Marcory', description: 'Marcory - Gare SBTA' },
+    { value: 'utb_plateau', label: 'UTB - Plateau', description: 'Plateau - Gare UTB' },
+    { value: 'alino_abobo', label: 'Alino - Abobo', description: 'Abobo - Gare Alino' },
+    { value: 'sbta_koumassi', label: 'SBTA - Koumassi', description: 'Koumassi - Gare SBTA' },
+    { value: 'utb_bingerville', label: 'UTB - Bingerville', description: 'Bingerville - Gare UTB' },
+    { value: 'alino_anyama', label: 'Alino - Anyama', description: 'Anyama - Gare Alino' },
+    { value: 'sbta_songon', label: 'SBTA - Songon', description: 'Songon - Gare SBTA' },
+    { value: 'avs_adjame', label: 'AVS - Adjame', description: 'Adjame - Gare AVS' },
+    { value: 'staf_koumassi', label: 'STAF - Koumassi', description: 'Koumassi - Gare STAF' },
+    { value: 'stc_intercity', label: 'STC Intercity', description: 'Abidjan - Gare STC Intercity' },
+    { value: 'bassam_treichville', label: 'Bassam - Treichville', description: 'Treichville - Gare de Bassam' },
+    { value: 'guinee_adjame', label: 'Guinée - Adjame', description: 'Adjame - Gare de Guinée' },
+    { value: 'internationale_abobo', label: 'Internationale - Abobo', description: 'Abobo - Gare Internationale' },
+    { value: 'lagunaire_koumassi', label: 'Lagunaire - Koumassi', description: 'Koumassi - Gare Lagunaire' },
+    { value: 'nord_adjame', label: 'Nord - Adjame', description: 'Adjame - Gare Nord' },
+    { value: 'st_adjame', label: 'ST - Adjame', description: 'Adjame - Gare ST' },
+    { value: 'sotra_marcory', label: 'SOTRA - Marcory', description: 'Marcory - Gare SOTRA' },
+  ];
+
+  // Gares d'Abidjan pour le sélecteur de gare
+  const abidjanStations = [
+    { value: 'sbta_adjame', label: 'SBTA - Adjame', description: 'Adjame - Gare principale interurbaine', lat: 5.3536, lon: -4.0206 },
+    { value: 'utb_cocody', label: 'UTB - Cocody', description: 'Cocody - Gare UTB', lat: 5.3583, lon: -3.9872 },
+    { value: 'alino_yopougon', label: 'Alino - Yopougon', description: 'Yopougon - Gare Alino', lat: 5.3364, lon: -4.0889 },
+    { value: 'sbta_marcory', label: 'SBTA - Marcory', description: 'Marcory - Gare SBTA', lat: 5.3017, lon: -4.0094 },
+    { value: 'utb_plateau', label: 'UTB - Plateau', description: 'Plateau - Gare UTB', lat: 5.3267, lon: -4.0305 },
+    { value: 'alino_abobo', label: 'Alino - Abobo', description: 'Abobo - Gare Alino', lat: 5.4247, lon: -4.0150 },
+    { value: 'sbta_koumassi', label: 'SBTA - Koumassi', description: 'Koumassi - Gare SBTA', lat: 5.3017, lon: -4.0094 },
+    { value: 'utb_bingerville', label: 'UTB - Bingerville', description: 'Bingerville - Gare UTB', lat: 5.3556, lon: -3.8944 },
+    { value: 'alino_anyama', label: 'Alino - Anyama', description: 'Anyama - Gare Alino', lat: 5.4953, lon: -4.0517 },
+    { value: 'sbta_songon', label: 'SBTA - Songon', description: 'Songon - Gare SBTA', lat: 5.2969, lon: -4.2644 },
+    { value: 'utb_attecoube', label: 'UTB - Attécoubé', description: 'Attécoubé - Gare UTB', lat: 5.3364, lon: -4.0889 },
+    { value: 'alino_port_bouet', label: 'Alino - Port-Bouët', description: 'Port-Bouët - Gare Alino', lat: 5.2547, lon: -3.9242 },
+    { value: 'avs_adjame', label: 'AVS - Adjame', description: 'Adjame - Gare AVS', lat: 5.3536, lon: -4.0206 },
+    { value: 'staf_koumassi', label: 'STAF - Koumassi', description: 'Koumassi - Gare STAF', lat: 5.3017, lon: -4.0094 },
+    { value: 'stc_intercity', label: 'STC Intercity', description: 'Abidjan - Gare STC Intercity', lat: 5.3267, lon: -4.0305 },
+    { value: 'bassam_treichville', label: 'Bassam - Treichville', description: 'Treichville - Gare de Bassam', lat: 5.3017, lon: -4.0094 },
+    { value: 'guinee_adjame', label: 'Guinée - Adjame', description: 'Adjame - Gare de Guinée', lat: 5.3536, lon: -4.0206 },
+    { value: 'internationale_abobo', label: 'Internationale - Abobo', description: 'Abobo - Gare Internationale', lat: 5.4247, lon: -4.0150 },
+    { value: 'lagunaire_koumassi', label: 'Lagunaire - Koumassi', description: 'Koumassi - Gare Lagunaire', lat: 5.3017, lon: -4.0094 },
+    { value: 'nord_adjame', label: 'Nord - Adjame', description: 'Adjame - Gare Nord', lat: 5.3536, lon: -4.0206 },
+    { value: 'st_adjame', label: 'ST - Adjame', description: 'Adjame - Gare ST', lat: 5.3536, lon: -4.0206 },
+    { value: 'sotra_marcory', label: 'SOTRA - Marcory', description: 'Marcory - Gare SOTRA', lat: 5.3017, lon: -4.0094 },
   ];
 
   // Fonction pour récupérer les grandes gares routières (lignes nationales) depuis OpenStreetMap
@@ -238,33 +290,124 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     stationLongitude: undefined,
     distanceKm: undefined,
     packages: [],
+    selectedRecipientPhone: '',
+    selectedRecipientName: '',
   });
 
   const [currentPackage, setCurrentPackage] = useState<PackageData>({
     packageCode: '',
     packageDescription: '',
     packageType: '',
-    estimatedValue: '',
     specialInstructions: '',
   });
 
   const [showPackageTypeSelector, setShowPackageTypeSelector] = useState(false);
   const [showStationSelector, setShowStationSelector] = useState(false);
   const [showCitySelector, setShowCitySelector] = useState(false);
+  const [showAbidjanStationSelector, setShowAbidjanStationSelector] = useState(false);
   const [showAddressSuggestions, setShowAddressSuggestions] = useState(false);
+  const [showContactModal, setShowContactModal] = useState(false);
+  const [contactSearchText, setContactSearchText] = useState('');
   const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [isTypingAddress, setIsTypingAddress] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [pricingInfo, setPricingInfo] = useState<PricingResult | null>(null);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const successSlideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const [currentPopupStep, setCurrentPopupStep] = useState(0);
+  const [showPopupModal, setShowPopupModal] = useState(false);
+  const popupSlideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const [currentPackageStep, setCurrentPackageStep] = useState(0);
+  const [showPackageModal, setShowPackageModal] = useState(false);
+  const packageSlideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const [showPackageChoiceModal, setShowPackageChoiceModal] = useState(false);
+  const packageChoiceSlideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
 
   const totalSteps = 3;
 
-  // Recalculer le prix quand la distance ou le nombre de colis change
+  // Recalculer le prix quand la distance, le nombre de colis ou le type de livraison change
   useEffect(() => {
     calculateDeliveryPricing();
-  }, [orderData.distanceKm, orderData.packages.length]);
+  }, [orderData.distanceKm, orderData.packages.length, orderData.packageCode, orderData.deliveryType]);
+
+  // Lancer automatiquement le popup quand on arrive à l'étape 1
+  useEffect(() => {
+    if (currentStep === 1) {
+      showPopupModalPopup();
+    }
+  }, [currentStep]);
+
+  // Gestion du clavier pour éviter la fermeture des modals
+  useEffect(() => {
+    const keyboardDidShowListener = Keyboard.addListener('keyboardDidShow', () => {
+      // Empêcher la fermeture automatique des modals quand le clavier apparaît
+    });
+    
+    const keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', () => {
+      // Optionnel: actions à effectuer quand le clavier se ferme
+    });
+
+    return () => {
+      keyboardDidShowListener.remove();
+      keyboardDidHideListener.remove();
+    };
+  }, []);
+
+  // Lancer automatiquement le popup de colis quand on arrive à l'étape 2
+  useEffect(() => {
+    if (currentStep === 2) {
+      showPackageModalPopup();
+    }
+  }, [currentStep]);
+
+  // Charger les gares au montage du composant
+  useEffect(() => {
+    loadStations();
+  }, []);
+
+  // Charger les contacts au montage du composant
+  useEffect(() => {
+    loadContactsOnce();
+  }, []);
+
+  // Fonction pour charger les gares
+  const loadStations = async () => {
+    setLoadingStations(true);
+    try {
+      // Gares de transport interurbain d'Abidjan
+      const stations = [
+        { value: 'sbta_adjame', label: 'SBTA - Adjame', latitude: 5.3536, longitude: -4.0206 },
+        { value: 'utb_cocody', label: 'UTB - Cocody', latitude: 5.3583, longitude: -3.9872 },
+        { value: 'alino_yopougon', label: 'Alino - Yopougon', latitude: 5.3364, longitude: -4.0889 },
+        { value: 'sbta_marcory', label: 'SBTA - Marcory', latitude: 5.3017, longitude: -4.0094 },
+        { value: 'utb_plateau', label: 'UTB - Plateau', latitude: 5.3267, longitude: -4.0305 },
+        { value: 'alino_abobo', label: 'Alino - Abobo', latitude: 5.4247, longitude: -4.0150 },
+        { value: 'sbta_koumassi', label: 'SBTA - Koumassi', latitude: 5.3017, longitude: -4.0094 },
+        { value: 'utb_bingerville', label: 'UTB - Bingerville', latitude: 5.3556, longitude: -3.8944 },
+        { value: 'alino_anyama', label: 'Alino - Anyama', latitude: 5.4953, longitude: -4.0517 },
+        { value: 'sbta_songon', label: 'SBTA - Songon', latitude: 5.2969, longitude: -4.2644 },
+        { value: 'utb_attecoube', label: 'UTB - Attécoubé', latitude: 5.3364, longitude: -4.0889 },
+        { value: 'alino_port_bouet', label: 'Alino - Port-Bouët', latitude: 5.2547, longitude: -3.9242 },
+        { value: 'avs_adjame', label: 'AVS - Adjame', latitude: 5.3536, longitude: -4.0206 },
+        { value: 'staf_koumassi', label: 'STAF - Koumassi', latitude: 5.3017, longitude: -4.0094 },
+        { value: 'stc_intercity', label: 'STC Intercity', latitude: 5.3267, longitude: -4.0305 },
+        { value: 'bassam_treichville', label: 'Bassam - Treichville', latitude: 5.3017, longitude: -4.0094 },
+        { value: 'guinee_adjame', label: 'Guinée - Adjame', latitude: 5.3536, longitude: -4.0206 },
+        { value: 'internationale_abobo', label: 'Internationale - Abobo', latitude: 5.4247, longitude: -4.0150 },
+        { value: 'lagunaire_koumassi', label: 'Lagunaire - Koumassi', latitude: 5.3017, longitude: -4.0094 },
+        { value: 'nord_adjame', label: 'Nord - Adjame', latitude: 5.3536, longitude: -4.0206 },
+        { value: 'st_adjame', label: 'ST - Adjame', latitude: 5.3536, longitude: -4.0206 },
+        { value: 'sotra_marcory', label: 'SOTRA - Marcory', latitude: 5.3017, longitude: -4.0094 },
+      ];
+      
+      setOsmStations(stations);
+    } catch (error) {
+      console.error('Erreur lors du chargement des gares:', error);
+      setOsmStations([]);
+    } finally {
+      setLoadingStations(false);
+    }
+  };
 
   // Fonction pour calculer la distance entre deux points GPS (formule de Haversine)
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number): number => {
@@ -282,10 +425,12 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
 
   // Fonction pour calculer le prix de livraison
   const calculateDeliveryPricing = () => {
-    if (orderData.distanceKm && orderData.distanceKm > 0 && orderData.packages.length > 0) {
+    if (orderData.distanceKm && orderData.distanceKm > 0) {
+      const totalPackages = orderData.packages.length + (orderData.packageCode ? 1 : 0);
       const pricing = PricingCalculator.calculateDeliveryPrice(
         orderData.distanceKm,
-        orderData.packages.length
+        totalPackages, // Nombre total de colis
+        orderData.deliveryType === 'express'
       );
       setPricingInfo(pricing);
     } else {
@@ -312,6 +457,365 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       setShowSuccessModal(false);
       navigation.navigate('Home');
     });
+  };
+
+  // Fonctions pour les popups séquentiels
+  const showNextPopup = () => {
+    // Fermer tous les sélecteurs ouverts
+    setShowCitySelector(false);
+    setShowStationSelector(false);
+    setShowAbidjanStationSelector(false);
+    
+    if (currentPopupStep < 5) {
+      setCurrentPopupStep(currentPopupStep + 1);
+    } else {
+      // Toutes les étapes sont terminées, passer à l'étape 2 et ouvrir le modal de type de livraison
+      setShowPopupModal(false);
+      setCurrentStep(2);
+      // Ouvrir directement le modal de type de livraison
+      setTimeout(() => {
+        showPackageModalPopup();
+      }, 100);
+    }
+  };
+
+  const showPreviousPopup = () => {
+    // Fermer tous les sélecteurs ouverts
+    setShowCitySelector(false);
+    setShowStationSelector(false);
+    setShowAbidjanStationSelector(false);
+    
+    if (currentPopupStep > 0) {
+      setCurrentPopupStep(currentPopupStep - 1);
+    } else {
+      setShowPopupModal(false);
+    }
+  };
+
+  // Fonction pour gérer la sélection d'une gare d'Abidjan
+  const handleAbidjanStationSelect = (stationValue: string) => {
+    const selectedStation = abidjanStations.find(station => station.value === stationValue);
+    if (selectedStation) {
+      setOrderData(prev => {
+        const newData = {
+          ...prev,
+          senderName: selectedStation.label,
+          destinationStation: selectedStation.value,
+          stationLatitude: selectedStation.lat,
+          stationLongitude: selectedStation.lon,
+        };
+        
+        // Calculer la distance si l'adresse de livraison a déjà été saisie
+        if (prev.deliveryLatitude && prev.deliveryLongitude && selectedStation.lat && selectedStation.lon) {
+          newData.distanceKm = calculateDistance(
+            selectedStation.lat,
+            selectedStation.lon,
+            prev.deliveryLatitude,
+            prev.deliveryLongitude
+          );
+        }
+        
+        return newData;
+      });
+    }
+    setShowAbidjanStationSelector(false);
+  };
+
+  // Fonction pour sélectionner un contact (comme Yango)
+  const selectContact = () => {
+    // Le sélecteur natif gère automatiquement les permissions
+    openContactPicker();
+  };
+
+  const openContactPicker = async () => {
+    console.log('Ouverture du sélecteur de contacts...');
+    
+    try {
+      // Demander la permission avec expo-contacts
+      const { status } = await Contacts.requestPermissionsAsync();
+      console.log('Statut permission contacts:', status);
+      
+      if (status === 'granted') {
+        fetchAndShowContacts();
+      } else {
+        Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès aux contacts pour utiliser cette fonctionnalité');
+      }
+    } catch (error) {
+      console.error('Erreur demande permission:', error);
+      Alert.alert('Erreur', 'Impossible de demander la permission d\'accès aux contacts');
+    }
+  };
+
+  const [allContacts, setAllContacts] = useState<any[]>([]);
+  const [contactModalType, setContactModalType] = useState<'sender' | 'recipient'>('sender');
+  const [contactsLoaded, setContactsLoaded] = useState(false);
+  const [loadingContacts, setLoadingContacts] = useState(false);
+
+  // Charger les contacts une seule fois au démarrage
+  const loadContactsOnce = async () => {
+    if (contactsLoaded || loadingContacts) return;
+    
+    setLoadingContacts(true);
+    console.log('Chargement initial des contacts...');
+    
+    try {
+      const { data: contacts } = await Contacts.getContactsAsync({
+        fields: [Contacts.Fields.PhoneNumbers, Contacts.Fields.Name],
+      });
+      
+      console.log('Contacts récupérés:', contacts.length);
+      
+      // Filtrer les contacts qui ont un numéro de téléphone
+      const contactsWithPhone = contacts.filter(contact => 
+        contact && contact.phoneNumbers && contact.phoneNumbers.length > 0
+      );
+
+      console.log('Contacts avec téléphone:', contactsWithPhone.length);
+      setAllContacts(contactsWithPhone);
+      setContactsLoaded(true);
+    } catch (error: any) {
+      console.error('Erreur lors du chargement des contacts:', error);
+    } finally {
+      setLoadingContacts(false);
+    }
+  };
+
+  const fetchAndShowContacts = async (type: 'sender' | 'recipient' = 'sender') => {
+    // Ouvrir immédiatement le modal pour une meilleure réactivité
+      setContactModalType(type);
+      setShowContactModal(true);
+    
+    // Charger les contacts si pas encore fait
+    if (!contactsLoaded && !loadingContacts) {
+      await loadContactsOnce();
+    }
+  };
+
+  const handleContactSelect = (contact: any) => {
+    const phoneNumber = contact.phoneNumbers?.[0]?.number;
+    if (phoneNumber) {
+      const cleanPhoneNumber = phoneNumber.replace(/\D/g, ''); // Supprimer les caractères non numériques
+      console.log('Numéro sélectionné:', cleanPhoneNumber);
+      setOrderData(prev => ({
+        ...prev,
+        senderPhone: cleanPhoneNumber
+      }));
+      setShowContactModal(false);
+      setContactSearchText('');
+      
+      // Ne plus passer automatiquement à l'étape suivante
+      // L'utilisateur devra cliquer sur "Suivant"
+    }
+  };
+
+  const handleRecipientSelect = (name: string, phone: string) => {
+    const cleanPhoneNumber = phone.replace(/\D/g, ''); // Supprimer les caractères non numériques
+    console.log('Destinataire sélectionné:', name, cleanPhoneNumber);
+    setOrderData(prev => ({
+      ...prev,
+      selectedRecipientName: name,
+      selectedRecipientPhone: cleanPhoneNumber,
+      // Si on sélectionne "Moi", utiliser les informations de l'expéditeur
+      ...(name === 'Moi' && {
+        receiverName: prev.senderName,
+        receiverPhone: prev.senderPhone
+      })
+    }));
+    setContactSearchText('');
+    
+    // Fermer le modal de sélection de contact
+    setShowContactModal(false);
+    
+    // Ne plus passer automatiquement à l'étape suivante
+    // L'utilisateur devra cliquer sur "Suivant"
+  };
+
+  // Filtrer les contacts selon le texte de recherche
+  const filteredContacts = allContacts.filter(contact => {
+    const searchLower = contactSearchText.toLowerCase();
+    const name = (contact.name || contact.firstName || '').toLowerCase();
+    const phone = contact.phoneNumbers?.[0]?.number || '';
+    return name.includes(searchLower) || phone.includes(searchLower);
+  });
+
+  const showPopupModalPopup = () => {
+    setCurrentPopupStep(0);
+    setShowPopupModal(true);
+    Animated.timing(popupSlideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hidePopupModal = () => {
+    Animated.timing(popupSlideAnim, {
+      toValue: Dimensions.get('window').height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPopupModal(false);
+      // Rediriger vers la page d'accueil quand on annule
+      navigation.navigate('Home');
+    });
+  };
+
+  const validatePopupStep = (step: number): boolean => {
+    switch (step) {
+      case 0:
+        return !!(orderData.senderName);
+      case 1:
+        return !!(orderData.deliveryAddress);
+      case 2:
+        return !!(orderData.selectedRecipientPhone || orderData.selectedRecipientName === 'Moi');
+      case 3:
+        return !!(orderData.senderCity);
+      case 4:
+        // Permettre de passer si on a au moins 1 colis (dans le champ ou déjà ajouté)
+        const totalPackages = orderData.packages.length + (orderData.packageCode ? 1 : 0);
+        return totalPackages > 0;
+      case 5:
+        return !!(orderData.senderPhone);
+      default:
+        return true;
+    }
+  };
+
+  // Fonctions pour les popups de colis
+  const showNextPackagePopup = () => {
+    if (currentPackageStep < 2) {
+      setCurrentPackageStep(currentPackageStep + 1);
+    } else {
+      // Toutes les étapes sont terminées, ajouter le colis et proposer les options
+      handleAddPackage();
+      setShowPackageModal(false);
+      // Afficher le popup de choix après ajout du colis
+      showPackageChoiceModalPopup();
+    }
+  };
+
+  const showPreviousPackagePopup = () => {
+    if (currentPackageStep > 0) {
+      setCurrentPackageStep(currentPackageStep - 1);
+    } else {
+      setShowPackageModal(false);
+    }
+  };
+
+  const showPackageModalPopup = () => {
+    setCurrentPackageStep(0);
+    setShowPackageModal(true);
+    Animated.timing(packageSlideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hidePackageModal = () => {
+    Animated.timing(packageSlideAnim, {
+      toValue: Dimensions.get('window').height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPackageModal(false);
+    });
+  };
+
+  const validatePackageStep = (step: number): boolean => {
+    switch (step) {
+      case 0:
+        return !!(currentPackage.packageCode);
+      case 1:
+        return !!(currentPackage.packageDescription);
+      case 2:
+        return !!(currentPackage.packageType);
+      default:
+        return true;
+    }
+  };
+
+  // Fonctions pour le popup de choix après ajout de colis
+  const showPackageChoiceModalPopup = () => {
+    setShowPackageChoiceModal(true);
+    Animated.timing(packageChoiceSlideAnim, {
+      toValue: 0,
+      duration: 300,
+      useNativeDriver: true,
+    }).start();
+  };
+
+  const hidePackageChoiceModal = () => {
+    Animated.timing(packageChoiceSlideAnim, {
+      toValue: Dimensions.get('window').height,
+      duration: 300,
+      useNativeDriver: true,
+    }).start(() => {
+      setShowPackageChoiceModal(false);
+    });
+  };
+
+  const handleValidateOrder = async () => {
+    hidePackageChoiceModal();
+    
+    try {
+      // Créer une commande simple
+      const newOrder = {
+        id: `order_${Date.now()}`,
+        orderNumber: `#PAKO-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
+        packageCode: orderData.packageCode || (orderData.packages.length > 0 ? orderData.packages[0].packageCode : 'PK' + Math.floor(Math.random() * 1000)),
+        description: 'Colis standard',
+        status: 'confirmed',
+        createdAt: new Date().toISOString(),
+        totalPrice: pricingInfo?.totalPrice || 0,
+        deliveryType: orderData.deliveryType || 'standard',
+        ...orderData
+      };
+
+      // Sauvegarder dans AsyncStorage avec une clé simple
+      const existingOrders = await AsyncStorage.getItem('@pako_simple_orders');
+      const orders = existingOrders ? JSON.parse(existingOrders) : [];
+      orders.push(newOrder);
+      await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(orders));
+
+      console.log('Commande sauvegardée:', newOrder.orderNumber);
+      console.log('Total commandes:', orders.length);
+
+      // Afficher un message de confirmation et naviguer vers Mes colis
+      Alert.alert(
+        'Commande validée !',
+        `Votre commande ${newOrder.orderNumber} a été confirmée et sera traitée sous peu.`,
+        [
+          {
+            text: 'Voir mes colis',
+            onPress: () => navigation.navigate('MyPackages')
+          },
+          {
+            text: 'Suivre le colis',
+            onPress: () => navigation.navigate('PackageTracking', { packageId: newOrder.orderNumber })
+          }
+        ]
+      );
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde de la commande:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la validation de votre commande. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
+    }
+  };
+
+  const handleAddAnotherPackage = () => {
+    hidePackageChoiceModal();
+    // Réinitialiser le formulaire de colis et relancer le popup
+    setCurrentPackage({
+      packageCode: '',
+      packageDescription: '',
+      packageType: '',
+      specialInstructions: '',
+    });
+    showPackageModalPopup();
   };
 
   const handleInputChange = (field: keyof PackageData, value: string) => {
@@ -579,25 +1083,68 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     setIsTypingAddress(false);
   };
 
-  const handleAddPackage = () => {
+  const canAddPackage = () => {
+    return !!(currentPackage.packageCode && currentPackage.packageDescription && currentPackage.packageType);
+  };
+
+  const handleAddPackage = async () => {
     if (!currentPackage.packageCode || !currentPackage.packageDescription || !currentPackage.packageType) {
       setErrorMessage('Veuillez remplir tous les champs obligatoires');
       setShowErrorModal(true);
       return;
     }
 
-    setOrderData(prev => ({
-      ...prev,
-      packages: [...prev.packages, currentPackage]
-    }));
+    const newOrderData = {
+      ...orderData,
+      packages: [...orderData.packages, currentPackage]
+    };
+
+    setOrderData(newOrderData);
+
+    // Sauvegarder en brouillon
+    try {
+      await AsyncStorage.setItem('@pako_draft_order', JSON.stringify(newOrderData));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du brouillon:', error);
+    }
 
     setCurrentPackage({
       packageCode: '',
       packageDescription: '',
       packageType: '',
-      estimatedValue: '',
       specialInstructions: '',
     });
+  };
+
+  // Nouvelle fonction pour ajouter un colis à partir d'un code colis uniquement
+  const handleAddPackageFromCode = async (packageCode: string) => {
+    if (!packageCode.trim()) {
+      setErrorMessage('Veuillez saisir un code colis');
+      setShowErrorModal(true);
+      return;
+    }
+
+    // Créer automatiquement un colis avec le code saisi
+    const newPackage: PackageData = {
+      packageCode: packageCode.toUpperCase(),
+      packageDescription: 'Colis standard',
+      packageType: 'standard',
+      specialInstructions: '',
+    };
+
+    const newOrderData = {
+      ...orderData,
+      packages: [...orderData.packages, newPackage]
+    };
+
+    setOrderData(newOrderData);
+
+    // Sauvegarder en brouillon
+    try {
+      await AsyncStorage.setItem('@pako_draft_order', JSON.stringify(newOrderData));
+    } catch (error) {
+      console.error('Erreur lors de la sauvegarde du brouillon:', error);
+    }
   };
 
   const handleRemovePackage = (index: number) => {
@@ -610,7 +1157,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
   const validateCurrentStep = () => {
     switch (currentStep) {
       case 1:
-        if (!orderData.senderName || !orderData.senderPhone || !orderData.senderCity || !orderData.receiverName || !orderData.receiverPhone || !orderData.deliveryAddress || !orderData.destinationStation) {
+        if (!orderData.senderName || !orderData.senderPhone || !orderData.senderCity || !orderData.receiverName || !orderData.receiverPhone || !orderData.deliveryAddress || !orderData.destinationStation || (!orderData.selectedRecipientPhone && orderData.selectedRecipientName !== 'Moi')) {
           setErrorMessage('Veuillez remplir tous les champs obligatoires');
           setShowErrorModal(true);
           return false;
@@ -696,7 +1243,11 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     </View>
   );
 
-  const renderStep1 = () => (
+  const renderStep1 = () => {
+    return null; // Ne rien afficher, juste lancer le popup
+  };
+
+  const renderStep1Old = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Étape 1/3 - Informations générales</Text>
       
@@ -776,7 +1327,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         
         <TextInput
           style={styles.input}
-          placeholder="Nom du destinataire *"
+          placeholder="Choisissez la gare *"
           value={orderData.receiverName}
           onChangeText={(value) => handleOrderInputChange('receiverName', value)}
         />
@@ -801,7 +1352,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             ]}>
               {orderData.deliveryAddress || 'Sélectionner sur la carte'}
             </Text>
-            <Text style={styles.addressSelectorIcon}>📍</Text>
+            <MaterialCommunityIcons name="map-marker" size={20} color={COLORS.primary} />
           </TouchableOpacity>
         </View>
       </View>
@@ -837,7 +1388,10 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           {/* Gares de transport interurbain (lignes nationales) */}
           {osmStations.length > 0 ? (
             <>
-              <Text style={styles.stationCategoryTitle}>🚍 Gares Transport National ({osmStations.length})</Text>
+              <View style={styles.stationCategoryHeader}>
+                <MaterialCommunityIcons name="bus" size={20} color={COLORS.primary} />
+                <Text style={styles.stationCategoryTitle}>Gares Transport National ({osmStations.length})</Text>
+              </View>
               {osmStations.map((station) => (
                 <TouchableOpacity
                   key={station.value}
@@ -847,7 +1401,10 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                   ]}
                   onPress={() => handleStationSelect(station.value)}
                 >
-                  <Text style={styles.stationOptionLabel}>🚍 {station.label}</Text>
+                  <View style={styles.stationOptionHeader}>
+                    <MaterialCommunityIcons name="bus" size={16} color={COLORS.primary} />
+                    <Text style={styles.stationOptionLabel}>{station.label}</Text>
+                  </View>
                   <Text style={styles.stationOptionDescription}>{station.description}</Text>
                 </TouchableOpacity>
               ))}
@@ -862,7 +1419,11 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     </View>
   );
 
-  const renderStep2 = () => (
+  const renderStep2 = () => {
+    return null; // Ne rien afficher pour l'étape 2
+  };
+
+  const renderStep2Old = () => (
     <View style={styles.stepContainer}>
       <Text style={styles.stepTitle}>Étape 2/3 - Ajouter un colis</Text>
       
@@ -926,13 +1487,6 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         </View>
       )}
       
-      <TextInput
-        style={styles.input}
-        placeholder="Valeur estimée (FCFA)"
-        value={currentPackage.estimatedValue}
-        onChangeText={(value) => handleInputChange('estimatedValue', value)}
-        keyboardType="numeric"
-      />
       
       <TextInput
         style={[styles.input, styles.textArea]}
@@ -974,22 +1528,18 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             <Text style={styles.kvValue}>{orderData.senderDistrict}</Text>
           </View>
         )}
-        <View style={styles.kvDivider} />
         <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Destinataire</Text>
-          <Text style={styles.kvValue}>{orderData.receiverName || '-'}</Text>
-        </View>
-        <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Téléphone destinataire</Text>
-          <Text style={styles.kvValue}>{orderData.receiverPhone || '-'}</Text>
-        </View>
-        <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Adresse</Text>
-          <Text style={styles.kvValue}>{orderData.deliveryAddress || '-'}</Text>
+          <Text style={styles.kvLabel}>Code du colis</Text>
+          <Text style={styles.kvValue}>{orderData.packageCode || '-'}</Text>
         </View>
         <View style={styles.kvRow}>
           <Text style={styles.kvLabel}>Gare</Text>
-          <Text style={styles.kvValue}>{osmStations.find(station => station.value === orderData.destinationStation)?.label || '-'}</Text>
+          <Text style={styles.kvValue}>{orderData.senderName || '-'}</Text>
+        </View>
+        <View style={styles.kvDivider} />
+        <View style={styles.kvRow}>
+          <Text style={styles.kvLabel}>Adresse de livraison</Text>
+          <Text style={styles.kvValue}>{orderData.deliveryAddress || '-'}</Text>
         </View>
         {orderData.distanceKm && (
           <View style={styles.kvRow}>
@@ -1000,7 +1550,20 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       </View>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Colis ({orderData.packages.length})</Text>
+        <Text style={styles.cardTitle}>
+          {(() => {
+            const totalPackages = orderData.packages.length + (orderData.packageCode ? 1 : 0);
+            return totalPackages === 1 ? '1 colis' : `${totalPackages} colis`;
+          })()}
+        </Text>
+
+        {/* Affichage du code du colis principal */}
+        {orderData.packageCode && (
+          <View style={styles.packageCodeSection}>
+            <Text style={styles.packageCodeLabel}>Code du colis :</Text>
+            <Text style={styles.packageCodeValue}>{orderData.packageCode}</Text>
+          </View>
+        )}
 
         {orderData.packages.map((pkg, index) => {
           const pkgTypeLabel = packageTypes.find(type => type.value === pkg.packageType)?.label;
@@ -1017,11 +1580,6 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                 {!!pkgTypeLabel && (
                   <View style={[styles.badge, styles.badgeInfo]}>
                     <Text style={styles.badgeText}>{pkgTypeLabel}</Text>
-                  </View>
-                )}
-                {!!pkg.estimatedValue && (
-                  <View style={[styles.badge, styles.badgePrimary]}>
-                    <Text style={styles.badgeText}>{`${pkg.estimatedValue} FCFA`}</Text>
                   </View>
                 )}
               </View>
@@ -1041,14 +1599,38 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           <Text style={styles.cardTitle}>💰 Prix de livraison</Text>
           
           <View style={styles.pricingRow}>
+            <Text style={styles.pricingLabel}>Type de livraison</Text>
+            <View style={styles.pricingValueWithIcon}>
+              {orderData.deliveryType === 'express' ? (
+                <>
+                  <MaterialCommunityIcons name="lightning-bolt" size={16} color="#FFD700" />
+                  <Text style={styles.pricingValue}>Express (- de 24h)</Text>
+                </>
+              ) : (
+                <>
+                  <MaterialCommunityIcons name="truck-delivery" size={16} color={COLORS.primary} />
+                  <Text style={styles.pricingValue}>Standard (72h)</Text>
+                </>
+              )}
+            </View>
+          </View>
+          
+          <View style={styles.pricingRow}>
             <Text style={styles.pricingLabel}>Distance</Text>
             <Text style={styles.pricingValue}>{pricingInfo.distanceKm} km</Text>
           </View>
           
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Prix du kilomètre</Text>
-            <Text style={styles.pricingValue}>1 KM à 500 FCFA</Text>
+            <Text style={styles.pricingLabel}>Prix de base</Text>
+            <Text style={styles.pricingValue}>{PricingCalculator.formatPrice(pricingInfo.basePrice)}</Text>
           </View>
+
+          {pricingInfo.expressCharge > 0 && (
+            <View style={styles.pricingRow}>
+              <Text style={styles.pricingLabel}>Supplément Express</Text>
+              <Text style={styles.pricingValue}>+{PricingCalculator.formatPrice(pricingInfo.expressCharge)}</Text>
+            </View>
+          )}
 
           <View style={styles.pricingDivider} />
           
@@ -1057,13 +1639,6 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             <Text style={styles.pricingTotalValue}>{PricingCalculator.formatPrice(pricingInfo.totalPrice)}</Text>
           </View>
           
-          {pricingInfo.packageCount > 1 && (
-            <View style={styles.pricingPerPackage}>
-              <Text style={styles.pricingPerPackageText}>
-                Soit {PricingCalculator.formatPrice(PricingCalculator.calculatePricePerPackage(pricingInfo.totalPrice, pricingInfo.packageCount))} par colis
-              </Text>
-            </View>
-          )}
         </View>
       )}
     </View>
@@ -1080,39 +1655,53 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         {currentStep === 2 && renderStep2()}
         {currentStep === 3 && renderStep3()}
 
-        <View style={styles.buttonContainer}>
-          {currentStep > 1 && (
-            <TouchableOpacity style={styles.previousButton} onPress={handlePrevious}>
-              <Text style={styles.previousButtonText}>Précédent</Text>
+        {currentStep > 1 && currentStep !== 2 && !showPackageModal && !showPackageChoiceModal && (
+          <View style={styles.modernButtonContainer}>
+            <TouchableOpacity style={styles.modernPreviousButton} onPress={handlePrevious}>
+              <MaterialCommunityIcons name="chevron-left" size={18} color={COLORS.textSecondary} />
+              <Text style={styles.modernPreviousButtonText}>Précédent</Text>
             </TouchableOpacity>
-          )}
-          
-          {currentStep < totalSteps ? (
-            <TouchableOpacity 
-              style={[
-                styles.nextButton, 
-                !isStepValid() && styles.disabledButton
-              ]} 
-              onPress={handleNext}
-              disabled={!isStepValid()}
-            >
-              <Text style={[
-                styles.nextButtonText,
-                !isStepValid() && styles.disabledButtonText
-              ]}>Suivant</Text>
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity 
-              style={[styles.nextButton, loading && styles.loadingButton]} 
-              onPress={handleSubmit}
-              disabled={loading}
-            >
-              <Text style={styles.nextButtonText}>
-                {loading ? 'Enregistrement...' : 'Valider la commande'}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+            
+            {currentStep < totalSteps ? (
+              <TouchableOpacity 
+                style={[
+                  styles.modernNextButton, 
+                  !isStepValid() && styles.modernDisabledButton
+                ]} 
+                onPress={handleNext}
+                disabled={!isStepValid()}
+              >
+                <Text style={[
+                  styles.modernNextButtonText,
+                  !isStepValid() && styles.modernDisabledButtonText
+                ]}>Suivant</Text>
+                <MaterialCommunityIcons 
+                  name="chevron-right" 
+                  size={18} 
+                  color={!isStepValid() ? COLORS.textSecondary : COLORS.white} 
+                />
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity 
+                style={[styles.modernNextButton, loading && styles.modernLoadingButton]} 
+                onPress={handleSubmit}
+                disabled={loading}
+              >
+                {loading ? (
+                  <>
+                    <ActivityIndicator size="small" color={COLORS.white} style={{ marginRight: 8 }} />
+                    <Text style={styles.modernNextButtonText}>Enregistrement...</Text>
+                  </>
+                ) : (
+                  <>
+                    <MaterialCommunityIcons name="check-circle" size={18} color={COLORS.white} />
+                    <Text style={styles.modernNextButtonText}>Valider la commande</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       </ScrollView>
 
       {/* Modal de sélection d'adresse sur carte */}
@@ -1128,7 +1717,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
               style={styles.mapModalCloseButton}
               onPress={() => setShowMapModal(false)}
             >
-              <Text style={styles.mapModalCloseText}>✕</Text>
+              <MaterialCommunityIcons name="close" size={20} color={COLORS.textSecondary} />
             </TouchableOpacity>
             <Text style={styles.mapModalTitle}>Sélectionner l'adresse de livraison</Text>
             <View style={styles.mapModalSpacer} />
@@ -1184,7 +1773,13 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             ]}
           >
             <View style={styles.successModalHeader}>
-              <Text style={styles.successModalTitle}>🎉 Félicitations !</Text>
+              <MaterialCommunityIcons 
+                name="check-circle" 
+                size={60} 
+                color="#4CAF50" 
+                style={styles.successIcon}
+              />
+              <Text style={styles.successModalTitle}>Félicitations !</Text>
             </View>
             
             <View style={styles.successModalContent}>
@@ -1200,6 +1795,722 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           </Animated.View>
         </View>
       </Modal>
+
+      {/* Modal des popups séquentiels */}
+      <Modal
+        visible={showPopupModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => {}}
+        presentationStyle="overFullScreen"
+      >
+        <KeyboardAvoidingView 
+          style={styles.popupModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <View style={styles.popupModalBackdrop} />
+          <Animated.View 
+            style={[
+              styles.popupModalContainer,
+              {
+                transform: [{ translateY: popupSlideAnim }]
+              }
+            ]}
+          >
+            {/* Handle du drawer */}
+            <View style={styles.drawerHandle} />
+            
+            {/* Étape 0: Nom expéditeur */}
+            {currentPopupStep === 0 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Gare où l'on va récupérer le colis</Text>
+                  <Text style={styles.popupStep}>1/6</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  <TouchableOpacity 
+                    style={styles.popupInput}
+                    onPress={() => setShowAbidjanStationSelector(!showAbidjanStationSelector)}
+                  >
+                    <Text style={[
+                      styles.popupInputText,
+                      !orderData.senderName && styles.placeholderText
+                    ]}>
+                      {orderData.senderName || 'Choisissez la gare'}
+                    </Text>
+                    <Text style={styles.dropdownIcon}>
+                      {showAbidjanStationSelector ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {showAbidjanStationSelector && (
+                    <ScrollView style={styles.abidjanStationOptions} nestedScrollEnabled={true}>
+                      <View style={styles.stationCategoryHeader}>
+                        <MaterialCommunityIcons name="bus" size={20} color={COLORS.primary} />
+                        <Text style={styles.stationCategoryTitle}>Gares d'Abidjan</Text>
+                      </View>
+                      {abidjanStations.map((station) => (
+                        <TouchableOpacity
+                          key={station.value}
+                          style={[
+                            styles.stationOption,
+                            orderData.senderName === station.label && styles.selectedStation
+                          ]}
+                          onPress={() => handleAbidjanStationSelect(station.value)}
+                        >
+                          <View style={styles.stationOptionHeader}>
+                    <MaterialCommunityIcons name="bus" size={16} color={COLORS.primary} />
+                    <Text style={styles.stationOptionLabel}>{station.label}</Text>
+                  </View>
+                          <Text style={styles.stationOptionDescription}>{station.description}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={hidePopupModal}
+                  >
+                    <Text style={styles.popupBackButtonText}>Annuler</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(0) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(0)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(0) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Étape 1: Lieu de livraison */}
+            {currentPopupStep === 1 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Lieu de livraison</Text>
+                  <Text style={styles.popupStep}>3/6</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  <TouchableOpacity 
+                    style={styles.popupSelector}
+                    onPress={() => setShowMapModal(true)}
+                  >
+                    <Text style={[
+                      styles.popupSelectorText,
+                      !orderData.deliveryAddress && styles.popupPlaceholderText
+                    ]}>
+                      {orderData.deliveryAddress || 'Sélectionner l\'adresse de livraison'}
+                    </Text>
+                    <MaterialCommunityIcons name="map-marker" size={20} color={COLORS.primary} style={styles.popupSelectorIcon} />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={showPreviousPopup}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(1) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(1)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(1) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Étape 2: Sélection du destinataire */}
+            {currentPopupStep === 2 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Qui va recevoir le colis ?</Text>
+                  <Text style={styles.popupStep}>2/6</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  {/* Bouton pour sélectionner un contact */}
+                  <TouchableOpacity 
+                    style={styles.popupContactSelector}
+                    onPress={() => {
+                      fetchAndShowContacts('recipient');
+                    }}
+                  >
+                    <Text style={styles.popupContactSelectorText}>
+                      {orderData.selectedRecipientPhone ? 
+                        `${orderData.selectedRecipientName} - ${orderData.selectedRecipientPhone}` : 
+                        'Sélectionner un contact'}
+                    </Text>
+                    <Text style={styles.popupContactSelectorIcon}>👤</Text>
+                  </TouchableOpacity>
+
+                  {/* Placeholder "Moi" */}
+                  <TouchableOpacity 
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      backgroundColor: orderData.selectedRecipientName === 'Moi' ? '#4CAF50' : '#e8f5e8',
+                      borderRadius: 8,
+                      paddingHorizontal: 15,
+                      paddingVertical: 12,
+                      marginTop: 10,
+                      marginBottom: 10,
+                      borderWidth: 2,
+                      borderColor: orderData.selectedRecipientName === 'Moi' ? '#2E7D32' : '#4CAF50',
+                    }}
+                    onPress={() => handleRecipientSelect('Moi', orderData.senderPhone || 'moi')}
+                  >
+                    <Text style={{
+                      flex: 1,
+                      fontSize: 16,
+                      color: orderData.selectedRecipientName === 'Moi' ? '#FFFFFF' : '#2E7D32',
+                      fontWeight: '600',
+                    }}>Moi</Text>
+                    <View style={{
+                      width: 20,
+                      height: 20,
+                      borderRadius: 10,
+                      borderWidth: 2,
+                      borderColor: orderData.selectedRecipientName === 'Moi' ? '#FFFFFF' : '#2E7D32',
+                      justifyContent: 'center',
+                      alignItems: 'center',
+                    }}>
+                      {orderData.selectedRecipientName === 'Moi' && (
+                        <View style={{
+                          width: 10,
+                          height: 10,
+                          borderRadius: 5,
+                          backgroundColor: '#FFFFFF',
+                        }} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Message d'information */}
+                  <View style={{ marginTop: 20, paddingHorizontal: 10 }}>
+                    <Text style={{ fontSize: 14, color: COLORS.textSecondary, textAlign: 'center', lineHeight: 20 }}>
+                      Choisissez qui va recevoir le colis ou sélectionnez "Moi"
+                    </Text>
+                  </View>
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={showPreviousPopup}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(2) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(2)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(2) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Étape 3: Ville de provenance */}
+            {currentPopupStep === 3 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>D'où vient le colis ?</Text>
+                  <Text style={styles.popupStep}>4/6</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  <TouchableOpacity 
+                    style={styles.popupSelector}
+                    onPress={() => setShowCitySelector(!showCitySelector)}
+                  >
+                    <Text style={[
+                      styles.popupSelectorText,
+                      !orderData.senderCity && styles.popupPlaceholderText
+                    ]}>
+                      {orderData.senderCity 
+                        ? coteIvoireCities.find(city => city.value === orderData.senderCity)?.label 
+                        : 'Ville d\'origine du colis'
+                      }
+                    </Text>
+                    <Text style={styles.popupSelectorIcon}>
+                      {showCitySelector ? '▲' : '▼'}
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  {showCitySelector && (
+                    <View style={styles.popupOptionsContainer}>
+                      <ScrollView 
+                        style={styles.popupOptionsScroll}
+                        showsVerticalScrollIndicator={false}
+                        nestedScrollEnabled={true}
+                      >
+                        {coteIvoireCities.map((city) => (
+                          <TouchableOpacity
+                            key={city.value}
+                            style={[
+                              styles.popupOption,
+                              orderData.senderCity === city.value && styles.popupOptionSelected
+                            ]}
+                            onPress={() => {
+                              handleCitySelect(city.value);
+                              setShowCitySelector(false);
+                            }}
+                          >
+                            <Text style={styles.popupOptionText}>{city.label}</Text>
+                          </TouchableOpacity>
+                        ))}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={showPreviousPopup}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(3) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(3)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(3) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Étape 4: Code du colis */}
+            {currentPopupStep === 4 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Code du colis</Text>
+                  <View style={styles.popupHeaderRight}>
+                    <Text style={styles.packageCounter}>
+                      {(() => {
+                        const totalPackages = orderData.packages.length + (orderData.packageCode ? 1 : 0);
+                        return totalPackages > 0 ? `${totalPackages} colis` : '';
+                      })()}
+                    </Text>
+                    <Text style={styles.popupStep}>5/6</Text>
+                  </View>
+                </View>
+                <View style={[styles.popupContent, styles.popupContentLarge]}>
+                  <Text style={styles.popupDescription}>
+                    Entrez le code de votre colis. Un code = 1 colis.
+                  </Text>
+                  <TextInput
+                    style={[styles.popupInput, styles.popupInputLarge]}
+                    placeholder="Entrez le code du colis (ex: ABC123)"
+                    value={orderData.packageCode || ''}
+                    onChangeText={(value) => handleOrderInputChange('packageCode', value.toUpperCase())}
+                    autoCapitalize="characters"
+                  />
+                  
+                  {/* Bouton Ajouter un autre colis */}
+                  <TouchableOpacity 
+                    style={styles.addAnotherPackageButton}
+                    onPress={() => {
+                      if (orderData.packageCode) {
+                        handleAddPackageFromCode(orderData.packageCode);
+                        handleOrderInputChange('packageCode', '');
+                      }
+                    }}
+                    disabled={!orderData.packageCode}
+                  >
+                    <Text style={[
+                      styles.addAnotherPackageButtonText,
+                      !orderData.packageCode && styles.addAnotherPackageButtonTextDisabled
+                    ]}>
+                      Ajouter un autre colis
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={showPreviousPopup}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(4) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(4)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(4) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+            {/* Étape 5: Téléphone expéditeur */}
+            {currentPopupStep === 5 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Sélectionner le numéro de l'expéditeur</Text>
+                  <Text style={styles.popupStep}>6/6</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  <TouchableOpacity 
+                    style={styles.popupInput}
+                    onPress={() => {
+                      fetchAndShowContacts('sender');
+                    }}
+                  >
+                    <MaterialCommunityIcons name="contacts" size={20} color={COLORS.primary} style={styles.contactSelectorIcon} />
+                    <Text style={[
+                      styles.popupInputText,
+                      !orderData.senderPhone && styles.placeholderText
+                    ]}>
+                      {orderData.senderPhone || 'Sélectionner un contact'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={showPreviousPopup}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !validatePopupStep(5) && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={showNextPopup}
+                    disabled={!validatePopupStep(5)}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !validatePopupStep(5) && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal des popups de colis */}
+      <Modal
+        visible={showPackageModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => {}}
+        presentationStyle="overFullScreen"
+      >
+        <KeyboardAvoidingView 
+          style={styles.popupModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
+          <View style={styles.popupModalBackdrop} />
+          <Animated.View 
+            style={[
+              styles.popupModalContainer,
+              {
+                transform: [{ translateY: packageSlideAnim }]
+              }
+            ]}
+          >
+            {/* Handle du drawer */}
+            <View style={styles.drawerHandle} />
+            
+            {/* Étape 0: Type de livraison */}
+            {currentPackageStep === 0 && (
+              <>
+                <View style={styles.popupHeader}>
+                  <Text style={styles.popupTitle}>Type de livraison</Text>
+                  <Text style={styles.popupStep}>1/1</Text>
+                </View>
+                <View style={styles.popupContent}>
+                  <Text style={styles.deliveryTypeLabel}>Choisissez le type de livraison :</Text>
+                  
+                  {/* Option Standard */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.deliveryTypeOption,
+                      orderData.deliveryType === 'standard' && styles.deliveryTypeOptionSelected
+                    ]}
+                    onPress={() => {
+                      setOrderData(prev => ({ ...prev, deliveryType: 'standard' }));
+                    }}
+                  >
+                    <View style={styles.deliveryTypeInfo}>
+                      <View style={styles.deliveryTypeHeader}>
+                        <View style={styles.deliveryTypeNameContainer}>
+                          <MaterialCommunityIcons name="truck-delivery" size={20} color={COLORS.primary} />
+                          <Text style={styles.deliveryTypeName}>Standard</Text>
+                        </View>
+                        <Text style={styles.deliveryTypePrice}>Prix normal</Text>
+                      </View>
+                      <Text style={styles.deliveryTypeDescription}>Livraison en 72h</Text>
+                    </View>
+                    <View style={styles.radioButton}>
+                      {orderData.deliveryType === 'standard' && (
+                        <View style={styles.radioButtonSelected} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+
+                  {/* Option Express */}
+                  <TouchableOpacity 
+                    style={[
+                      styles.deliveryTypeOption,
+                      orderData.deliveryType === 'express' && styles.deliveryTypeOptionSelected
+                    ]}
+                    onPress={() => {
+                      setOrderData(prev => ({ ...prev, deliveryType: 'express' }));
+                    }}
+                  >
+                    <View style={styles.deliveryTypeInfo}>
+                      <View style={styles.deliveryTypeHeader}>
+                        <View style={styles.deliveryTypeNameContainer}>
+                          <MaterialCommunityIcons name="lightning-bolt" size={20} color="#FFD700" />
+                          <Text style={styles.deliveryTypeName}>Express</Text>
+                        </View>
+                        <Text style={styles.deliveryTypePriceExtra}>+2000 FCFA</Text>
+                      </View>
+                      <Text style={styles.deliveryTypeDescription}>Livraison en moins de 24h</Text>
+                    </View>
+                    <View style={styles.radioButton}>
+                      {orderData.deliveryType === 'express' && (
+                        <View style={styles.radioButtonSelected} />
+                      )}
+                    </View>
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.popupActions}>
+                  <TouchableOpacity 
+                    style={styles.popupBackButton}
+                    onPress={() => {
+                      hidePackageModal();
+                      setCurrentPopupStep(5);
+                      setShowPopupModal(true);
+                    }}
+                  >
+                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.popupNextButton,
+                      !orderData.deliveryType && styles.popupNextButtonDisabled
+                    ]}
+                    onPress={() => {
+                      hidePackageModal();
+                      setCurrentStep(3);
+                    }}
+                    disabled={!orderData.deliveryType}
+                  >
+                    <Text style={[
+                      styles.popupNextButtonText,
+                      !orderData.deliveryType && styles.popupNextButtonTextDisabled
+                    ]}>
+                      Suivant
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
+
+          </Animated.View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Modal de choix après ajout de colis */}
+      <Modal
+        visible={showPackageChoiceModal}
+        transparent={true}
+        animationType="none"
+        onRequestClose={() => {}}
+      >
+        <View style={styles.popupModalOverlay}>
+          <View style={styles.popupModalBackdrop} />
+          <Animated.View 
+            style={[
+              styles.popupModalContainer,
+              {
+                transform: [{ translateY: packageChoiceSlideAnim }]
+              }
+            ]}
+          >
+            {/* Handle du drawer */}
+            <View style={styles.drawerHandle} />
+            
+            <View style={styles.popupHeader}>
+              <Text style={styles.popupTitle}>🎉 Colis enregistré !</Text>
+            </View>
+            
+            <View style={styles.popupContent}>
+              <Text style={styles.popupMessage}>
+                Votre colis a été ajouté avec succès à la commande. 
+                Vous pouvez maintenant valider votre commande ou ajouter un autre colis.
+              </Text>
+              
+              <View style={styles.packageChoiceButtons}>
+                <TouchableOpacity 
+                  style={styles.packageChoiceButton}
+                  onPress={handleValidateOrder}
+                >
+                  <Text style={styles.packageChoiceButtonText}>🎉 Valider la commande</Text>
+                </TouchableOpacity>
+                
+                <TouchableOpacity 
+                  style={[styles.packageChoiceButton, styles.packageChoiceButtonSecondary]}
+                  onPress={handleAddAnotherPackage}
+                >
+                  <Text style={[styles.packageChoiceButtonText, styles.packageChoiceButtonTextSecondary]}>
+                    📦 Ajouter un autre colis
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </Animated.View>
+        </View>
+      </Modal>
+
+      {/* Modal de sélection des contacts */}
+      <Modal
+        visible={showContactModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={() => setShowContactModal(false)}
+      >
+        <View style={styles.contactModalOverlay}>
+          <View style={styles.contactModalContainer}>
+            {/* Header */}
+            <View style={styles.contactModalHeader}>
+              <Text style={styles.contactModalTitle}>
+                {contactModalType === 'sender' ? 'Expéditeur' : 'Destinataire'}
+              </Text>
+              <TouchableOpacity 
+                style={styles.contactModalCloseButton}
+                onPress={() => setShowContactModal(false)}
+              >
+                <MaterialCommunityIcons name="close" size={20} color={COLORS.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {/* Barre de recherche */}
+            <View style={styles.contactSearchContainer}>
+              <TextInput
+                style={styles.contactSearchInput}
+                placeholder="Saisissez un nom ou un numéro de téléphone"
+                value={contactSearchText}
+                onChangeText={setContactSearchText}
+                placeholderTextColor="#999"
+              />
+            </View>
+
+            {/* Liste des contacts */}
+            <ScrollView style={styles.contactList}>
+              {loadingContacts ? (
+                <View style={styles.contactLoadingContainer}>
+                  <ActivityIndicator size="large" color={COLORS.primary} />
+                  <Text style={styles.contactLoadingText}>Chargement des contacts...</Text>
+                </View>
+              ) : filteredContacts.length === 0 ? (
+                <View style={styles.contactEmptyContainer}>
+                  <Text style={styles.contactEmptyText}>
+                    {contactSearchText ? 'Aucun contact trouvé' : 'Aucun contact disponible'}
+                  </Text>
+                </View>
+              ) : (
+                filteredContacts.map((contact, index) => (
+                <TouchableOpacity
+                  key={index}
+                  style={styles.contactItem}
+                  onPress={() => {
+                    if (contactModalType === 'sender') {
+                      handleContactSelect(contact);
+                    } else {
+                      handleRecipientSelect(
+                        contact.name || contact.firstName || 'Contact',
+                        contact.phoneNumbers?.[0]?.number || ''
+                      );
+                      setShowContactModal(false);
+                    }
+                  }}
+                >
+                  <View style={styles.contactInfo}>
+                    <Text style={styles.contactName}>
+                      {contact.name || contact.firstName || 'Contact'}
+                    </Text>
+                    <Text style={styles.contactPhone}>
+                      {contact.phoneNumbers?.[0]?.number || 'N/A'}
+                    </Text>
+                  </View>
+                  <View style={styles.contactRadio}>
+                    <View style={styles.radioButton}>
+                      {(contactModalType === 'sender' ? 
+                        orderData.senderPhone === contact.phoneNumbers?.[0]?.number?.replace(/\D/g, '') :
+                        orderData.selectedRecipientPhone === contact.phoneNumbers?.[0]?.number?.replace(/\D/g, '')
+                      ) && (
+                        <View style={styles.radioButtonSelected} />
+                      )}
+                    </View>
+                  </View>
+                </TouchableOpacity>
+                ))
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
     </View>
   );
 };
@@ -1354,6 +2665,8 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     justifyContent: 'center',
+    flex: 1,
+    paddingVertical: 40,
   },
   loadingText: {
     marginTop: 10,
@@ -1636,6 +2949,26 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     lineHeight: 20,
   },
+  packageCodeSection: {
+    backgroundColor: '#fff3cd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: '#ffeaa7',
+  },
+  packageCodeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  packageCodeValue: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: COLORS.primary,
+    fontFamily: 'monospace',
+  },
   packageCard: {
     backgroundColor: COLORS.white,
     borderRadius: 10,
@@ -1700,32 +3033,25 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     lineHeight: 16,
   },
-  buttonContainer: {
+  modernButtonContainer: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    paddingVertical: 24,
     paddingHorizontal: 20,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: -2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 5,
+    paddingBottom: 20,
+    paddingTop: 16,
+    gap: 20,
   },
-  previousButton: {
+  modernPreviousButton: {
     flex: 1,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    paddingVertical: 18,
+    flexDirection: 'row',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginRight: 12,
-    borderWidth: 2,
-    borderColor: COLORS.border,
+    justifyContent: 'center',
+    borderWidth: 1.5,
+    borderColor: '#E9ECEF',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -1735,37 +3061,47 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 3,
   },
-  previousButtonText: {
+  modernPreviousButtonText: {
     color: COLORS.textPrimary,
-    fontSize: 16,
-    fontWeight: '700',
-    letterSpacing: 0.5,
+    fontSize: 15,
+    fontWeight: '600',
+    marginLeft: 6,
   },
-  nextButton: {
-    flex: 1,
+  modernNextButton: {
+    flex: 2,
+    flexDirection: 'row',
     backgroundColor: COLORS.primary,
-    borderRadius: 12,
-    paddingVertical: 18,
+    borderRadius: 16,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
     alignItems: 'center',
-    marginLeft: 12,
+    justifyContent: 'center',
     shadowColor: COLORS.primary,
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 6,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    elevation: 8,
   },
-  nextButtonText: {
+  modernNextButtonText: {
     color: COLORS.white,
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: '700',
-    letterSpacing: 0.5,
+    marginRight: 6,
   },
-  loadingButton: {
-    opacity: 0.7,
-    shadowOpacity: 0.1,
+  modernDisabledButton: {
+    backgroundColor: COLORS.lightGray,
+    shadowOpacity: 0,
+    elevation: 0,
+  },
+  modernDisabledButtonText: {
+    color: COLORS.textSecondary,
+  },
+  modernLoadingButton: {
+    opacity: 0.8,
+    shadowOpacity: 0.2,
   },
   disabledButton: {
     backgroundColor: COLORS.primary,
@@ -1898,11 +3234,17 @@ const styles = StyleSheet.create({
     color: COLORS.textSecondary,
     flex: 1,
   },
+  pricingValueWithIcon: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
   pricingValue: {
     fontSize: 14,
     fontWeight: '600',
     color: COLORS.textPrimary,
     textAlign: 'right',
+    marginLeft: 6,
   },
   pricingTotalLabel: {
     fontSize: 16,
@@ -1954,6 +3296,8 @@ const styles = StyleSheet.create({
   },
   successModalHeader: {
     marginBottom: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   successModalTitle: {
     fontSize: 24,
@@ -1983,6 +3327,605 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.white,
+  },
+  // Styles pour les popups séquentiels (drawer du bas vers le haut)
+  popupModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  popupModalBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  popupModalContainer: {
+    backgroundColor: COLORS.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 24,
+    paddingBottom: 40,
+    width: '100%',
+    maxHeight: '70%',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: -5,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  drawerHandle: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#E0E0E0',
+    borderRadius: 2,
+    marginBottom: 20,
+    marginTop: 8,
+  },
+  popupHeader: {
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  popupTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  popupStep: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
+  },
+  popupContent: {
+    width: '100%',
+    marginBottom: 24,
+  },
+  popupInput: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 16,
+    fontSize: 16,
+    backgroundColor: '#F8F8F8',
+    marginBottom: 12,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  popupInputText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  abidjanStationOptions: {
+    maxHeight: 200,
+    backgroundColor: COLORS.white,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    marginTop: 8,
+  },
+  popupPhoneInput: {
+    marginTop: 12,
+  },
+  contactSelectorIcon: {
+    marginRight: 10,
+  },
+  popupSelector: {
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 12,
+    padding: 16,
+    backgroundColor: '#F8F8F8',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  popupSelectorText: {
+    fontSize: 16,
+    color: COLORS.textPrimary,
+    flex: 1,
+  },
+  popupPlaceholderText: {
+    color: '#999',
+  },
+  popupSelectorIcon: {
+    fontSize: 16,
+    color: '#999',
+    marginLeft: 8,
+  },
+  popupOptionsContainer: {
+    marginTop: 8,
+    maxHeight: 200,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    borderRadius: 8,
+    backgroundColor: COLORS.white,
+  },
+  popupOptionsScroll: {
+    maxHeight: 200,
+  },
+  popupOption: {
+    padding: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  popupOptionSelected: {
+    backgroundColor: '#F0F8FF',
+  },
+  popupOptionText: {
+    fontSize: 14,
+    color: COLORS.textPrimary,
+  },
+  popupActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+    gap: 12,
+  },
+  popupBackButton: {
+    flex: 1,
+    backgroundColor: '#F5F5F5',
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  popupBackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textSecondary,
+  },
+  popupNextButton: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    alignItems: 'center',
+  },
+  popupNextButtonDisabled: {
+    backgroundColor: '#E0E0E0',
+  },
+  popupNextButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  popupNextButtonTextDisabled: {
+    color: '#999',
+  },
+  // Styles pour l'écran d'accueil simplifié
+  welcomeContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+  },
+  welcomeTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  welcomeSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 40,
+  },
+  startButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 16,
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  startButtonText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  // Styles pour le popup de choix après ajout de colis
+  popupMessage: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 22,
+    marginBottom: 24,
+  },
+  packageChoiceButtons: {
+    width: '100%',
+    gap: 12,
+  },
+  packageChoiceButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    padding: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  packageChoiceButtonSecondary: {
+    backgroundColor: '#F8F9FA',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  packageChoiceButtonText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: COLORS.white,
+  },
+  packageChoiceButtonTextSecondary: {
+    color: COLORS.textPrimary,
+  },
+  packageChoiceButtonSubtext: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  // Styles pour le modal des contacts
+  contactModalOverlay: {
+    flex: 1,
+    backgroundColor: COLORS.white,
+  },
+  contactModalContainer: {
+    backgroundColor: COLORS.white,
+    flex: 1,
+  },
+  contactModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingTop: 50,
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  contactModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+  },
+  contactModalCloseButton: {
+    padding: 8,
+  },
+  contactModalCloseText: {
+    fontSize: 18,
+    color: COLORS.textSecondary,
+  },
+  contactModalDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    backgroundColor: '#F8F9FA',
+  },
+  contactSearchContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: COLORS.lightGray,
+  },
+  contactSearchInput: {
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 16,
+    color: COLORS.textPrimary,
+  },
+  contactList: {
+    flex: 1,
+  },
+  contactItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  contactInfo: {
+    flex: 1,
+  },
+  contactName: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 4,
+  },
+  contactPhone: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+  },
+  contactRadio: {
+    marginLeft: 12,
+  },
+  radioButton: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: COLORS.lightGray,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  radioButtonSelected: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: COLORS.primary,
+  },
+  // Styles pour les options de type de livraison
+  deliveryTypeLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginBottom: 16,
+  },
+  deliveryTypeOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: 16,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: 'transparent',
+    marginBottom: 12,
+  },
+  deliveryTypeOptionSelected: {
+    borderColor: COLORS.primary,
+    backgroundColor: '#E8F5E9',
+  },
+  deliveryTypeInfo: {
+    flex: 1,
+  },
+  deliveryTypeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  deliveryTypeNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  deliveryTypeName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginLeft: 8,
+  },
+  deliveryTypePrice: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    fontWeight: '500',
+  },
+  deliveryTypePriceExtra: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: 'bold',
+  },
+  deliveryTypeDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 4,
+  },
+  // Styles pour le popup de sélection du destinataire
+  popupContactSelector: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#f5f5f5',
+    borderRadius: 8,
+    paddingHorizontal: 15,
+    paddingVertical: 12,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  popupContactSelectorText: {
+    flex: 1,
+    fontSize: 16,
+    color: '#333',
+  },
+  popupContactSelectorIcon: {
+    fontSize: 18,
+    marginLeft: 10,
+  },
+  stepSubtitle: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 24,
+  },
+  successIcon: {
+    marginBottom: 16,
+  },
+  // Styles pour la liste des colis
+  packageListContainer: {
+    marginBottom: 20,
+  },
+  packageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+  },
+  packageInfo: {
+    flex: 1,
+  },
+  packageTypeLabel: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '500',
+  },
+  removePackageButton: {
+    padding: 8,
+    marginLeft: 12,
+  },
+  emptyPackageContainer: {
+    alignItems: 'center',
+    paddingVertical: 40,
+    backgroundColor: '#F8F9FA',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
+    borderStyle: 'dashed',
+  },
+  emptyPackageText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: COLORS.textPrimary,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyPackageSubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  addPackageButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    marginBottom: 20,
+  },
+  addPackageButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
+    marginLeft: 8,
+  },
+  contactLoadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  contactLoadingText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    marginTop: 16,
+  },
+  contactEmptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  contactEmptyText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+  },
+  stationCategoryHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  stationOptionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  popupContentLarge: {
+    minHeight: 200,
+    paddingVertical: 20,
+  },
+  popupDescription: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 20,
+  },
+  popupInputLarge: {
+    paddingVertical: 20,
+    fontSize: 18,
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  addAnotherPackageButton: {
+    backgroundColor: '#4CAF50',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    marginBottom: 16,
+    borderWidth: 2,
+    borderColor: '#45A049',
+    shadowColor: '#4CAF50',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  addAnotherPackageButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+    textShadowColor: 'rgba(0, 0, 0, 0.3)',
+    textShadowOffset: { width: 0, height: 1 },
+    textShadowRadius: 2,
+  },
+  addAnotherPackageButtonTextDisabled: {
+    color: '#BDBDBD',
+    textShadowColor: 'transparent',
+  },
+  popupHeaderRight: {
+    alignItems: 'flex-end',
+  },
+  packageCounter: {
+    fontSize: 12,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginBottom: 2,
+    backgroundColor: '#E8F5E8',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 8,
   },
 });
 

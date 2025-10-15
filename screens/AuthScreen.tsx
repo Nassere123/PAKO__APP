@@ -9,6 +9,8 @@ import {
   Platform,
   ScrollView,
   Image,
+  Modal,
+  Animated,
 } from 'react-native';
 import { Input, Button, PhoneInput, Checkbox } from '../components';
 import { COLORS, SIZES } from '../constants';
@@ -25,6 +27,9 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
   const [loading, setLoading] = useState<boolean>(false);
   const [acceptedTerms, setAcceptedTerms] = useState<boolean>(false);
   const [acceptedPrivacy, setAcceptedPrivacy] = useState<boolean>(false);
+  const [showErrorModal, setShowErrorModal] = useState<boolean>(false);
+  const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorTitle, setErrorTitle] = useState<string>('Erreur');
 
   const handleInputChange = (field: keyof RegisterData, value: string): void => {
     setFormData(prev => ({
@@ -33,26 +38,32 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
     }));
   };
 
+  const showError = (title: string, message: string): void => {
+    setErrorTitle(title);
+    setErrorMessage(message);
+    setShowErrorModal(true);
+  };
+
   const validateForm = (): boolean => {
     if (!formData.phone) {
-      Alert.alert('Erreur', 'Veuillez saisir votre numéro de téléphone');
+      showError('Erreur', 'Veuillez saisir votre numéro de téléphone');
       return false;
     }
 
     if (!isLogin) {
       if (!formData.firstName || !formData.lastName) {
-        Alert.alert('Erreur', 'Veuillez remplir tous les champs d\'inscription');
+        showError('Erreur', 'Veuillez remplir tous les champs d\'inscription');
         return false;
       }
 
       // Vérifier l'acceptation des conditions pour l'inscription
       if (!acceptedTerms) {
-        Alert.alert('Erreur', 'Veuillez accepter les conditions d\'utilisation');
+        showError('Erreur', 'Veuillez accepter les conditions d\'utilisation');
         return false;
       }
 
       if (!acceptedPrivacy) {
-        Alert.alert('Erreur', 'Veuillez accepter la politique de confidentialité');
+        showError('Erreur', 'Veuillez accepter la politique de confidentialité');
         return false;
       }
     }
@@ -111,11 +122,16 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
       >
         {/* Contenu principal centré */}
         <View style={styles.mainContent}>
-          {/* Icône principale retirée */}
+          {/* Logo PAKO */}
+          <Image 
+            source={require('../assets/PAKO APP.png')} 
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
 
           {/* Titre */}
           <Text style={styles.title}>
-            {isLogin ? 'Connexion' : 'Bonjour'}
+            {isLogin ? 'Connexion' : 'Inscription'}
           </Text>
           
           {/* Sous-titre */}
@@ -211,6 +227,30 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
           </View>
         </View>
       </ScrollView>
+
+      {/* Modal d'erreur */}
+      <Modal
+        visible={showErrorModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowErrorModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContainer}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalIcon}>⚠️</Text>
+              <Text style={styles.modalTitle}>{errorTitle}</Text>
+            </View>
+            <Text style={styles.modalMessage}>{errorMessage}</Text>
+            <TouchableOpacity 
+              style={styles.modalButton}
+              onPress={() => setShowErrorModal(false)}
+            >
+              <Text style={styles.modalButtonText}>OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </KeyboardAvoidingView>
   );
 };
@@ -239,6 +279,12 @@ const styles = StyleSheet.create({
     height: 140,
     marginBottom: 30,
     marginTop: 20,
+    alignSelf: 'center',
+  },
+  logoImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
     alignSelf: 'center',
   },
   title: {
@@ -336,6 +382,64 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 4,
+  },
+  // Styles pour le modal d'erreur
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContainer: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 24,
+    width: '100%',
+    maxWidth: 340,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalIcon: {
+    fontSize: 48,
+    marginBottom: 12,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#2C3E50',
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 16,
+    color: '#7F8C8D',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButton: {
+    backgroundColor: COLORS.primary,
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    borderRadius: 12,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

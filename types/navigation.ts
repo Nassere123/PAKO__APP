@@ -6,15 +6,13 @@ export type RootStackParamList = {
   Welcome: { firstName: string; lastName: string; phone: string };
   Auth: { initialMode?: 'login' | 'register' };
   PhoneVerification: { phone: string; isRegistration: boolean; firstName?: string; lastName?: string };
-  ForgotPassword: undefined;
   Home: undefined;
   Profile: undefined;
   PackageTracking: { packageId: string };
   History: undefined;
-  PackageRegistration: undefined;
   MultiStepPackageRegistration: { editCart?: any };
   Evaluation: undefined;
-  Payment: undefined;
+  Payment: any; // OrderData
   Cart: undefined;
   MyPackages: undefined;
   PackageList: { category: 'received' | 'in_transit' | 'cancelled' };
@@ -24,12 +22,10 @@ export type RootStackParamList = {
 export type WelcomeScreenProps = StackScreenProps<RootStackParamList, 'Welcome'>;
 export type AuthScreenProps = StackScreenProps<RootStackParamList, 'Auth'>;
 export type PhoneVerificationScreenProps = StackScreenProps<RootStackParamList, 'PhoneVerification'>;
-export type ForgotPasswordScreenProps = StackScreenProps<RootStackParamList, 'ForgotPassword'>;
 export type HomeScreenProps = StackScreenProps<RootStackParamList, 'Home'>;
 export type ProfileScreenProps = StackScreenProps<RootStackParamList, 'Profile'>;
 export type PackageTrackingScreenProps = StackScreenProps<RootStackParamList, 'PackageTracking'>;
 export type HistoryScreenProps = StackScreenProps<RootStackParamList, 'History'>;
-export type PackageRegistrationScreenProps = StackScreenProps<RootStackParamList, 'PackageRegistration'>;
 export type MultiStepPackageRegistrationScreenProps = StackScreenProps<RootStackParamList, 'MultiStepPackageRegistration'>;
 export type EvaluationScreenProps = StackScreenProps<RootStackParamList, 'Evaluation'>;
 export type PaymentScreenProps = StackScreenProps<RootStackParamList, 'Payment'>;

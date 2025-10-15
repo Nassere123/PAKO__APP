@@ -11,6 +11,7 @@ import {
 import { COLORS } from '../constants';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
+import { OrderService } from '../services/orderService';
 
 type PaymentScreenProps = StackScreenProps<RootStackParamList, 'Payment'>;
 
@@ -65,20 +66,59 @@ const PaymentScreen: React.FC<PaymentScreenProps> = ({ navigation }) => {
 
     setLoading(true);
     
-    // Simulation de paiement
-    setTimeout(() => {
+    try {
+      // Simulation de paiement
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      // Récupérer les données de commande depuis les paramètres de navigation
+      const orderData = navigation.getState().routes.find(route => 
+        route.name === 'Payment'
+      )?.params as any;
+
+      if (orderData) {
+        // Sauvegarder la commande avec le statut "confirmed"
+        const savedOrder = await OrderService.saveOrder({
+          ...orderData,
+          totalPrice: packageDetails.total,
+          paymentMethod: selectedPaymentMethod,
+          status: 'confirmed' as const,
+        });
+
+        console.log('Commande sauvegardée:', savedOrder.orderNumber);
+
+        setLoading(false);
+        Alert.alert(
+          'Paiement réussi !',
+          `Votre commande ${savedOrder.orderNumber} a été confirmée et sera traitée sous peu.`,
+          [
+            {
+              text: 'Voir mes colis',
+              onPress: () => navigation.navigate('MyPackages')
+            },
+            {
+              text: 'Suivre le colis',
+              onPress: () => navigation.navigate('PackageTracking', { packageId: savedOrder.orderNumber })
+            }
+          ]
+        );
+      } else {
+        // Fallback si pas de données de commande
+        setLoading(false);
+        Alert.alert(
+          'Paiement réussi !',
+          'Votre paiement a été traité avec succès',
+          [
+            {
+              text: 'OK',
+              onPress: () => navigation.navigate('PackageTracking', { packageId: packageDetails.id })
+            }
+          ]
+        );
+      }
+    } catch (error) {
       setLoading(false);
-      Alert.alert(
-        'Paiement réussi !',
-        'Votre paiement a été traité avec succès',
-        [
-          {
-            text: 'OK',
-            onPress: () => navigation.navigate('PackageTracking', { packageId: packageDetails.id })
-          }
-        ]
-      );
-    }, 2000);
+      Alert.alert('Erreur', 'Une erreur est survenue lors du traitement du paiement');
+    }
   };
 
   const renderPaymentMethod = (method: any) => (

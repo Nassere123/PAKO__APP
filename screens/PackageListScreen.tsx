@@ -1,257 +1,166 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert } from 'react-native';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
-import { PackageService, PackageData } from '../services';
-import { CancelPackageModal } from '../components';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type PackageListScreenProps = StackScreenProps<RootStackParamList, 'PackageList'>;
 
-// Interface Package supprimée - utilisation directe de PackageData
-
 const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route }) => {
   const { category } = route.params as { category: 'received' | 'in_transit' | 'cancelled' };
-  const [modalVisible, setModalVisible] = useState(false);
-  const [selectedPackage, setSelectedPackage] = useState<PackageData | null>(null);
-  const [packages, setPackages] = useState<PackageData[]>([]);
-  const [showCancelModal, setShowCancelModal] = useState(false);
-  const [packageToCancel, setPackageToCancel] = useState<PackageData | null>(null);
-  const slideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const [orders, setOrders] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Charger les colis au montage du composant
   useEffect(() => {
-    loadPackages();
+    loadOrders();
   }, [category]);
 
-  const loadPackages = async () => {
+  const loadOrders = async () => {
     try {
-      let loadedPackages: PackageData[] = [];
+      setLoading(true);
+      
+      // Charger depuis la clé simple
+      const simpleOrders = await AsyncStorage.getItem('@pako_simple_orders');
+      const allOrders = simpleOrders ? JSON.parse(simpleOrders) : [];
+      
+      let filteredOrders: any[] = [];
       
       switch (category) {
         case 'received':
-          loadedPackages = await PackageService.getPackagesByStatus('delivered');
+          filteredOrders = allOrders.filter((order: any) => order.status === 'delivered');
           break;
         case 'in_transit':
-          loadedPackages = await PackageService.getPackagesByStatus('in_transit');
+          filteredOrders = allOrders.filter((order: any) => 
+            order.status === 'confirmed' || order.status === 'in_transit' || order.status === 'pending'
+          );
           break;
         case 'cancelled':
-          loadedPackages = await PackageService.getPackagesByStatus('cancelled');
+          filteredOrders = allOrders.filter((order: any) => order.status === 'cancelled');
           break;
         default:
-          loadedPackages = await PackageService.getUserPackages();
+          filteredOrders = allOrders;
       }
       
-      // Si aucune donnée n'est trouvée, créer les données de test
-      if (loadedPackages.length === 0) {
-        await PackageService.createTestData();
-        // Recharger après création des données de test
-        switch (category) {
-          case 'received':
-            loadedPackages = await PackageService.getPackagesByStatus('delivered');
-            break;
-          case 'in_transit':
-            loadedPackages = await PackageService.getPackagesByStatus('in_transit');
-            break;
-          case 'cancelled':
-            loadedPackages = await PackageService.getPackagesByStatus('cancelled');
-            break;
-          default:
-            loadedPackages = await PackageService.getUserPackages();
-        }
+      setOrders(filteredOrders);
+      
+      // Si aucune commande pour les colis en cours, créer une commande de test
+      if (filteredOrders.length === 0 && category === 'in_transit') {
+        await createTestOrder();
+        loadOrders(); // Recharger
       }
       
-      setPackages(loadedPackages);
     } catch (error) {
-      console.error('Erreur lors du chargement des colis:', error);
-      // En cas d'erreur, utiliser les données de test en mémoire
-      setPackages(packagesData[category] || []);
+      console.error('Erreur lors du chargement des commandes:', error);
+      setOrders([]);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleCancelPackage = (pkg: any) => {
-    // Convertir les données de test en format PackageData si nécessaire
-    const packageData: PackageData = {
-      id: pkg.id,
-      trackingNumber: pkg.trackingNumber || pkg.code,
-      description: pkg.description,
-      status: pkg.status,
-      sender: pkg.sender || 'Expéditeur inconnu',
-      estimatedArrival: pkg.estimatedArrival,
-      actualArrival: pkg.actualArrival,
-      deliveryDate: pkg.deliveryDate,
-      createdAt: pkg.createdAt || new Date().toISOString(),
-      updatedAt: pkg.updatedAt || new Date().toISOString(),
-      canCancel: pkg.canCancel || (pkg.status === 'in_transit' || pkg.status === 'pending')
+  const createTestOrder = async () => {
+    const testOrder = {
+      id: `test_${Date.now()}`,
+      orderNumber: `#PAKO-TEST-${Math.floor(Math.random() * 1000)}`,
+      packageCode: 'PK002',
+      deliveryAddress: 'Cocody, Angré 8ème Tranche, Abidjan',
+      senderName: 'Test User',
+      status: 'confirmed',
+      createdAt: new Date().toISOString(),
+      totalPrice: 2500,
+      deliveryType: 'standard',
+      packages: [{ packageCode: 'PK002', packageDescription: 'Colis standard' }]
     };
     
-    setPackageToCancel(packageData);
-    setShowCancelModal(true);
+    const existingOrders = await AsyncStorage.getItem('@pako_simple_orders');
+    const orders = existingOrders ? JSON.parse(existingOrders) : [];
+    orders.push(testOrder);
+    await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(orders));
   };
-
-  const confirmCancelPackage = async () => {
-    if (!packageToCancel) return;
-    
-    try {
-      // Annuler via le service (qui gère maintenant toutes les données)
-      await PackageService.cancelPackage(packageToCancel.id);
-      setShowCancelModal(false);
-      setPackageToCancel(null);
-      // Recharger les colis
-      loadPackages();
-      Alert.alert('Succès', 'Le colis a été annulé avec succès.');
-    } catch (error) {
-      console.error('Erreur lors de l\'annulation:', error);
-      Alert.alert('Erreur', 'Impossible d\'annuler ce colis.');
-    }
-  };
-
-  const cancelCancelPackage = () => {
-    setShowCancelModal(false);
-    setPackageToCancel(null);
-  };
-
-  // Données de test pour les colis (fallback)
-  const packagesData: Record<string, PackageData[]> = {
-    received: [
-      {
-        id: '1',
-        trackingNumber: 'ABC123',
-        description: 'Vêtements et accessoires',
-        status: 'delivered',
-        sender: 'Boutique Mode',
-        estimatedArrival: '2024-12-15',
-        actualArrival: '2024-12-15',
-        deliveryDate: '2024-12-15',
-        createdAt: '2024-12-10T10:00:00Z',
-        updatedAt: '2024-12-15T14:30:00Z',
-        canCancel: false
-      },
-      {
-        id: '2',
-        trackingNumber: 'DEF456',
-        description: 'Livres et documents',
-        status: 'delivered',
-        sender: 'Librairie Universelle',
-        estimatedArrival: '2024-12-12',
-        actualArrival: '2024-12-12',
-        deliveryDate: '2024-12-12',
-        createdAt: '2024-12-08T09:00:00Z',
-        updatedAt: '2024-12-12T16:00:00Z',
-        canCancel: false
-      },
-      {
-        id: '3',
-        trackingNumber: 'GHI789',
-        description: 'Produits cosmétiques',
-        status: 'delivered',
-        sender: 'Parfumerie Centrale',
-        estimatedArrival: '2024-12-10',
-        actualArrival: '2024-12-10',
-        deliveryDate: '2024-12-10',
-        createdAt: '2024-12-05T11:00:00Z',
-        updatedAt: '2024-12-10T13:45:00Z',
-        canCancel: false
-      }
-    ],
-    in_transit: [
-      {
-        id: '4',
-        trackingNumber: 'JKL012',
-        description: 'Équipements électroniques',
-        status: 'in_transit',
-        sender: 'Tech Store',
-        estimatedArrival: '2024-12-18',
-        createdAt: '2024-12-15T08:00:00Z',
-        updatedAt: '2024-12-16T10:00:00Z',
-        canCancel: true
-      },
-      {
-        id: '5',
-        trackingNumber: 'MNO345',
-        description: 'Pièces détachées auto',
-        status: 'pending',
-        sender: 'Auto Parts',
-        estimatedArrival: '2024-12-20',
-        createdAt: '2024-12-17T14:00:00Z',
-        updatedAt: '2024-12-17T14:00:00Z',
-        canCancel: true
-      }
-    ],
-    cancelled: [
-      {
-        id: '6',
-        trackingNumber: 'PQR678',
-        description: 'Mobilier de bureau',
-        status: 'cancelled',
-        sender: 'Mobilier Pro',
-        estimatedArrival: '2024-12-05',
-        createdAt: '2024-12-01T09:00:00Z',
-        updatedAt: '2024-12-05T12:00:00Z',
-        canCancel: false
-      }
-    ]
-  };
-
-  // Utiliser les données du service (qui incluent maintenant les données de test sauvegardées)
-  const displayPackages = packages;
 
   const getCategoryInfo = () => {
     switch (category) {
       case 'received':
         return {
-          title: '✓ Colis reçus',
+          title: 'Colis reçus',
           subtitle: 'Colis livrés avec succès',
-          color: '#4CAF50'
+          color: '#4CAF50',
+          icon: true
         };
       case 'in_transit':
         return {
           title: 'Colis en cours de livraison',
           subtitle: 'Colis actuellement en transit',
           color: '#FF9800',
-          icon: 'itinerary'
+          icon: true
         };
       case 'cancelled':
         return {
-          title: '🚫 Colis annulés',
+          title: 'Colis annulés',
           subtitle: 'Colis annulés ou retournés',
-          color: '#F44336'
+          color: '#F44336',
+          icon: false
         };
       default:
         return {
-          title: '📦 Mes colis',
-          subtitle: 'Liste de vos colis',
-          color: COLORS.primary
+          title: 'Tous les colis',
+          subtitle: 'Historique complet',
+          color: '#2196F3',
+          icon: false
         };
     }
   };
 
   const categoryInfo = getCategoryInfo();
 
-  const showModal = (pkg: PackageData) => {
-    setSelectedPackage(pkg);
-    setModalVisible(true);
-    Animated.timing(slideAnim, {
-      toValue: 0,
-      duration: 300,
-      useNativeDriver: true,
-    }).start();
-  };
-
-  const hideModal = () => {
-    Animated.timing(slideAnim, {
-      toValue: Dimensions.get('window').height,
-      duration: 300,
-      useNativeDriver: true,
-    }).start(() => {
-      setModalVisible(false);
-      setSelectedPackage(null);
-    });
-  };
-
-  const handlePackagePress = (pkg: PackageData) => {
-    showModal(pkg);
-  };
+  const renderOrderItem = ({ order }: { order: any }) => (
+    <TouchableOpacity
+      key={order.id}
+      style={styles.packageCard}
+      onPress={() => navigation.navigate('PackageTracking', { packageId: order.orderNumber })}
+    >
+      <View style={styles.packageHeader}>
+        <Text style={styles.packageCode}>{order.packageCode || order.orderNumber}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: categoryInfo.color }]}>
+          <Text style={styles.statusText}>En cours</Text>
+        </View>
+      </View>
+      
+      {/* Utiliser les données du récapitulatif */}
+      <Text style={styles.packageDescription}>
+        {order.packages?.length > 0 ? `${order.packages.length} colis` : '1 colis'}
+        {order.deliveryType === 'express' ? ' • Express' : ' • Standard'}
+      </Text>
+      <Text style={styles.packageType}>📍 {order.deliveryAddress}</Text>
+      
+      <View style={styles.packageFooter}>
+        <Text style={styles.packageDate}>📅 {new Date(order.createdAt).toLocaleDateString('fr-FR')}</Text>
+        {order.totalPrice && order.totalPrice > 0 && (
+          <Text style={styles.packageValue}>💰 {order.totalPrice.toLocaleString()} FCFA</Text>
+        )}
+      </View>
+      
+      <Text style={styles.trackingNumber}>🔍 Suivi: {order.packageCode || order.orderNumber}</Text>
+      
+      {category === 'in_transit' && (
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.trackButton}
+            onPress={() => navigation.navigate('PackageTracking', { packageId: order.orderNumber })}
+          >
+            <Text style={styles.trackButtonText}>📍 Suivre en temps réel</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={() => Alert.alert('Annulation', 'Fonctionnalité d\'annulation à implémenter')}
+          >
+            <Text style={styles.cancelButtonText}>✗ Annuler</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </TouchableOpacity>
+  );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
@@ -260,6 +169,28 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
       <Text style={styles.emptyStateText}>
         Vous n'avez aucun colis dans cette catégorie pour le moment.
       </Text>
+      {category === 'in_transit' && (
+        <View style={styles.actionButtonsContainer}>
+          <TouchableOpacity 
+            style={styles.trackButton}
+            onPress={async () => {
+              await createTestOrder();
+              loadOrders();
+            }}
+          >
+            <Text style={styles.trackButtonText}>➕ Créer test</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.cancelButton}
+            onPress={async () => {
+              await AsyncStorage.removeItem('@pako_simple_orders');
+              loadOrders();
+            }}
+          >
+            <Text style={styles.cancelButtonText}>🗑️ Vider</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </View>
   );
 
@@ -276,220 +207,24 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.categoryHeader}>
           <View style={styles.categoryTitleContainer}>
-            {categoryInfo.icon && (
-              <Image 
-                source={require('../assets/itinerary.png')} 
-                style={styles.categoryIcon}
-                resizeMode="contain"
-              />
-            )}
             <Text style={styles.categoryTitle}>{categoryInfo.title}</Text>
           </View>
           <Text style={styles.categorySubtitle}>{categoryInfo.subtitle}</Text>
           <View style={[styles.categoryIndicator, { backgroundColor: categoryInfo.color }]} />
         </View>
 
-        {displayPackages.length === 0 ? (
+        {loading ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateText}>Chargement des commandes...</Text>
+          </View>
+        ) : orders.length === 0 ? (
           renderEmptyState()
         ) : (
           <View style={styles.packagesList}>
-            {displayPackages.map((pkg) => (
-              <TouchableOpacity
-                key={pkg.id}
-                style={styles.packageCard}
-                onPress={() => handlePackagePress(pkg)}
-              >
-                <View style={styles.packageHeader}>
-                  <Text style={styles.packageCode}>{pkg.trackingNumber}</Text>
-                  <View style={[styles.statusBadge, { backgroundColor: categoryInfo.color }]}>
-                    <Text style={styles.statusText}>
-                      {pkg.status === 'delivered' ? 'Livré' : 
-                       pkg.status === 'in_transit' ? 'En cours' : 
-                       pkg.status === 'pending' ? 'En attente' : 
-                       pkg.status === 'cancelled' ? 'Annulé' : 
-                       pkg.status}
-                    </Text>
-                  </View>
-                </View>
-                
-                <Text style={styles.packageDescription}>{pkg.description}</Text>
-                <Text style={styles.packageType}>Expéditeur: {pkg.sender}</Text>
-                
-                <View style={styles.packageFooter}>
-                  <Text style={styles.packageDate}>📅 {new Date(pkg.createdAt).toLocaleDateString('fr-FR')}</Text>
-                  {pkg.estimatedArrival && (
-                    <Text style={styles.packageValue}>📦 Arrivée: {new Date(pkg.estimatedArrival).toLocaleDateString('fr-FR')}</Text>
-                  )}
-                </View>
-                
-                <Text style={styles.trackingNumber}>🔍 Suivi: {pkg.trackingNumber}</Text>
-                
-                {category === 'in_transit' && (
-                  <View style={styles.actionButtonsContainer}>
-                    <TouchableOpacity 
-                      style={styles.trackButton}
-                      onPress={() => navigation.navigate('PackageTracking', { packageId: pkg.trackingNumber || pkg.id })}
-                    >
-                      <Text style={styles.trackButtonText}>📍 Suivre en temps réel</Text>
-                    </TouchableOpacity>
-                    
-                    {(pkg.canCancel || (pkg.status === 'in_transit' || pkg.status === 'pending')) && (
-                      <TouchableOpacity 
-                        style={styles.cancelButton}
-                        onPress={() => handleCancelPackage(pkg)}
-                      >
-                        <Text style={styles.cancelButtonText}>✗ Annuler</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                )}
-                
-                {category === 'received' && (
-                  <TouchableOpacity 
-                    style={styles.rateButton}
-                    onPress={() => navigation.navigate('PackageRating', { 
-                      packageId: pkg.trackingNumber, 
-                      packageData: pkg 
-                    })}
-                  >
-                    <Text style={styles.rateButtonText}>⭐ Évaluer la livraison</Text>
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))}
+            {orders.map((order) => renderOrderItem({ order }))}
           </View>
         )}
       </ScrollView>
-
-      {/* Modal pour les détails du colis */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="none"
-        onRequestClose={hideModal}
-      >
-        <View style={styles.modalOverlay}>
-          <TouchableOpacity 
-            style={styles.modalBackdrop} 
-            activeOpacity={1} 
-            onPress={hideModal}
-          />
-          <Animated.View 
-            style={[
-              styles.modalContainer,
-              {
-                transform: [{ translateY: slideAnim }]
-              }
-            ]}
-          >
-            {selectedPackage && (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Détails du colis {selectedPackage.trackingNumber}</Text>
-                </View>
-                
-                <View style={styles.modalContent}>
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Description:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.description}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Expéditeur:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.sender}</Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Statut:</Text>
-                    <Text style={styles.detailValue}>
-                      {selectedPackage.status === 'delivered' ? 'Livré' : 
-                       selectedPackage.status === 'in_transit' ? 'En cours' : 
-                       selectedPackage.status === 'pending' ? 'En attente' : 
-                       selectedPackage.status === 'cancelled' ? 'Annulé' : 
-                       selectedPackage.status}
-                    </Text>
-                  </View>
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Date de création:</Text>
-                    <Text style={styles.detailValue}>{new Date(selectedPackage.createdAt).toLocaleDateString('fr-FR')}</Text>
-                  </View>
-                  
-                  {selectedPackage.estimatedArrival && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Arrivée estimée:</Text>
-                      <Text style={styles.detailValue}>{new Date(selectedPackage.estimatedArrival).toLocaleDateString('fr-FR')}</Text>
-                    </View>
-                  )}
-                  
-                  {selectedPackage.actualArrival && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Arrivée réelle:</Text>
-                      <Text style={styles.detailValue}>{new Date(selectedPackage.actualArrival).toLocaleDateString('fr-FR')}</Text>
-                    </View>
-                  )}
-                  
-                  {selectedPackage.deliveryDate && (
-                    <View style={styles.detailRow}>
-                      <Text style={styles.detailLabel}>Date de livraison:</Text>
-                      <Text style={styles.detailValue}>{new Date(selectedPackage.deliveryDate).toLocaleDateString('fr-FR')}</Text>
-                    </View>
-                  )}
-                  
-                  <View style={styles.detailRow}>
-                    <Text style={styles.detailLabel}>Numéro de suivi:</Text>
-                    <Text style={styles.detailValue}>{selectedPackage.trackingNumber}</Text>
-                  </View>
-                </View>
-                
-                <View style={styles.modalActions}>
-                  {category === 'in_transit' && (
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => {
-                        hideModal();
-                        navigation.navigate('PackageTracking', { packageId: selectedPackage.trackingNumber || selectedPackage.id });
-                      }}
-                    >
-                      <Text style={styles.actionButtonText}>SUIVRE EN TEMPS RÉEL</Text>
-                    </TouchableOpacity>
-                  )}
-                  
-                  {category === 'received' && (
-                    <TouchableOpacity 
-                      style={styles.actionButton}
-                      onPress={() => {
-                        hideModal();
-                        navigation.navigate('PackageRating', { 
-                          packageId: selectedPackage.trackingNumber || selectedPackage.id, 
-                          packageData: selectedPackage 
-                        });
-                      }}
-                    >
-                      <Text style={styles.actionButtonText}>⭐ ÉVALUER LA LIVRAISON</Text>
-                    </TouchableOpacity>
-                  )}
-                  
-                  <TouchableOpacity 
-                    style={styles.cancelButton}
-                    onPress={hideModal}
-                  >
-                    <Text style={styles.cancelButtonText}>OK</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
-          </Animated.View>
-        </View>
-      </Modal>
-
-      {/* Modal d'annulation de colis */}
-      <CancelPackageModal
-        visible={showCancelModal}
-        packageData={packageToCancel}
-        onConfirm={confirmCancelPackage}
-        onCancel={cancelCancelPackage}
-      />
     </View>
   );
 };
@@ -497,114 +232,97 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.white,
+    backgroundColor: '#F5F5F5',
   },
   header: {
-    paddingTop: 50,
-    paddingBottom: 20,
-    paddingHorizontal: 20,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    backgroundColor: COLORS.primary,
+    paddingTop: 50,
+    paddingBottom: 15,
+    paddingHorizontal: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E0E0E0',
   },
   backButton: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: '500',
+    fontSize: 18,
+    color: COLORS.white,
+    fontWeight: '600',
   },
   headerTitle: {
-    color: COLORS.primary,
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
+    color: COLORS.white,
   },
   headerSpacer: {
     width: 60,
   },
   content: {
     flex: 1,
-    paddingHorizontal: 20,
+    padding: 20,
   },
   categoryHeader: {
-    paddingVertical: 20,
-    alignItems: 'center',
+    marginBottom: 20,
   },
   categoryTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 4,
-  },
-  categoryIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 8,
+    marginBottom: 8,
   },
   categoryTitle: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-    fontFamily: 'Rubik-Bold',
+    color: '#000000',
   },
   categorySubtitle: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.textSecondary,
-    textAlign: 'center',
-    marginBottom: 12,
-    fontFamily: 'Rubik-Regular',
+    marginBottom: 10,
   },
   categoryIndicator: {
-    width: 40,
-    height: 4,
+    height: 3,
     borderRadius: 2,
   },
   packagesList: {
-    marginBottom: 30,
+    gap: 15,
   },
   packageCard: {
     backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     marginBottom: 12,
-    borderWidth: 1,
-    borderColor: COLORS.border,
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowRadius: 4,
+    elevation: 3,
   },
   packageHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 12,
   },
   packageCode: {
-    fontSize: 18,
+    fontSize: 16,
     fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    fontFamily: 'Rubik-Bold',
+    color: '#000000',
   },
   statusBadge: {
     paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
   },
   statusText: {
-    color: COLORS.white,
     fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Rubik-SemiBold',
+    fontWeight: 'bold',
+    color: COLORS.white,
   },
   packageDescription: {
-    fontSize: 16,
+    fontSize: 14,
     color: COLORS.textPrimary,
-    marginBottom: 4,
-    fontFamily: 'Rubik-Regular',
+    marginBottom: 8,
   },
   packageType: {
     fontSize: 14,
@@ -612,18 +330,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   packageFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 8,
   },
   packageDate: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    marginBottom: 4,
   },
   packageValue: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    fontWeight: '600',
   },
   trackingNumber: {
     fontSize: 12,
@@ -634,12 +350,12 @@ const styles = StyleSheet.create({
   actionButtonsContainer: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
+    marginTop: 12,
   },
   trackButton: {
     backgroundColor: COLORS.primary,
     borderRadius: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     flex: 1,
   },
@@ -652,7 +368,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     backgroundColor: '#F44336',
     borderRadius: 8,
-    paddingVertical: 8,
+    paddingVertical: 10,
     paddingHorizontal: 12,
     flex: 1,
   },
@@ -661,19 +377,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     textAlign: 'center',
-  },
-  rateButton: {
-    backgroundColor: '#FF9800',
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginTop: 8,
-    alignSelf: 'flex-start',
-  },
-  rateButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
   },
   emptyState: {
     alignItems: 'center',
@@ -693,72 +396,8 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: COLORS.textSecondary,
     textAlign: 'center',
+    marginBottom: 20,
     lineHeight: 22,
-  },
-  // Styles pour le modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalBackdrop: {
-    flex: 1,
-  },
-  modalContainer: {
-    backgroundColor: COLORS.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 40,
-    maxHeight: '80%',
-  },
-  modalHeader: {
-    marginBottom: 20,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-    textAlign: 'center',
-  },
-  modalContent: {
-    marginBottom: 20,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    marginBottom: 12,
-    alignItems: 'flex-start',
-  },
-  detailLabel: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-    width: 120,
-  },
-  detailValue: {
-    fontSize: 16,
-    color: COLORS.textSecondary,
-    flex: 1,
-  },
-  modalActions: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  actionButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    flex: 1,
-    marginRight: 8,
-    alignItems: 'center',
-  },
-  actionButtonText: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: 'bold',
   },
 });
 

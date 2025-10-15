@@ -3,6 +3,7 @@
 // ============================================================================
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { ProfileScreenProps } from '../types';
 import { COLORS } from '../constants';
 import { useAuth } from '../hooks';
@@ -101,53 +102,38 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>🚗</Text>
+              <Ionicons name="car-outline" size={28} color={COLORS.primary} style={styles.statIcon} />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Courses</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>❌</Text>
+              <Ionicons name="close-circle-outline" size={28} color={COLORS.primary} style={styles.statIcon} />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Annulées</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>📦</Text>
+              <Ionicons name="cube-outline" size={28} color={COLORS.primary} style={styles.statIcon} />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>En cours</Text>
             </View>
             <View style={styles.statCard}>
-              <Text style={styles.statIcon}>✅</Text>
+              <Ionicons name="checkmark-circle-outline" size={28} color={COLORS.primary} style={styles.statIcon} />
               <Text style={styles.statNumber}>0</Text>
               <Text style={styles.statLabel}>Validées</Text>
             </View>
           </View>
         </View>
 
-        {/* Section Actions */}
-        <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>🔒</Text>
-            </View>
-            <Text style={styles.actionText}>Changer votre mot de passe</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
         {/* Section Historique et Adresses */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>📋</Text>
-            </View>
+            <Ionicons name="document-text-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <Text style={styles.actionText}>Historique des colis</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>📍</Text>
-            </View>
+            <Ionicons name="location-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <Text style={styles.actionText}>Mes adresses</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -156,9 +142,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Paiement */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>💳</Text>
-            </View>
+            <Ionicons name="card-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionText}>Modes de paiement</Text>
               <Text style={styles.actionSubtext}>Espèces</Text>
@@ -167,9 +151,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>🎁</Text>
-            </View>
+            <Ionicons name="gift-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <View style={styles.actionTextContainer}>
               <Text style={styles.actionText}>Réductions et cadeaux</Text>
               <Text style={styles.actionSubtext}>Saisir un code promotionnel</Text>
@@ -181,36 +163,22 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
         {/* Section Assistance */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>🎧</Text>
-            </View>
+            <Ionicons name="headset-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <Text style={styles.actionText}>Assistance</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
           
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>ℹ️</Text>
-            </View>
+            <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <Text style={styles.actionText}>Informations</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Section Sécurité */}
+        {/* Section Paramètres */}
         <View style={styles.section}>
           <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>🛡️</Text>
-            </View>
-            <Text style={styles.actionText}>Sécurité</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionItem}>
-            <View style={styles.actionIconContainer}>
-              <Text style={styles.actionIcon}>⚙️</Text>
-            </View>
+            <Ionicons name="settings-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <Text style={styles.actionText}>Paramètres</Text>
             <Text style={styles.actionArrow}>›</Text>
           </TouchableOpacity>
@@ -330,18 +298,8 @@ const styles = StyleSheet.create({
     shadowRadius: 2,
     elevation: 2,
   },
-  actionIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#FFF3E0',
-    justifyContent: 'center',
-    alignItems: 'center',
+  iconOnly: {
     marginRight: 16,
-  },
-  actionIcon: {
-    fontSize: 18,
-    color: '#FF6B35',
   },
   actionText: {
     fontSize: 16,
@@ -382,7 +340,6 @@ const styles = StyleSheet.create({
     elevation: 2,
   },
   statIcon: {
-    fontSize: 24,
     marginBottom: 8,
   },
   statNumber: {

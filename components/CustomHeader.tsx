@@ -39,13 +39,6 @@ const CustomHeader: React.FC<CustomHeaderProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Icône de notification */}
-      <TouchableOpacity 
-        style={styles.notificationContainer}
-        onPress={onNotificationPress}
-      >
-        <Image source={require('../assets/notification.png')} style={styles.notificationIcon} resizeMode="contain" />
-      </TouchableOpacity>
     </View>
   );
 };
@@ -106,18 +99,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: '#666666', // Gris foncé comme dans l'image
     fontWeight: '500',
-  },
-  notificationContainer: {
-    padding: 8,
-  },
-  bellIcon: {
-    fontSize: 24,
-    color: COLORS.primary, // Orange pour l'icône
-  },
-  notificationIcon: {
-    width: 24,
-    height: 24,
-    tintColor: COLORS.primary,
   },
 });
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, StyleSheet, TextInput, TouchableOpacity, FlatList, Keyboard, Platform, Animated } from 'react-native';
 import MapView, { Marker, UrlTile, Region } from 'react-native-maps';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
 // import Constants from 'expo-constants';
 import * as Location from 'expo-location';
@@ -117,16 +118,8 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
     setSelected({ latitude, longitude, label: item.display_name });
     setResults([]);
     
-    // Afficher le nom du lieu dans la barre de recherche (format simplifié)
-    const placeName = (() => {
-      const parts = item.display_name.split(',');
-      if (parts.length >= 3) {
-        return parts[1].trim() || parts[0].trim();
-      }
-      return parts[0].trim();
-    })();
-    
-    setQuery(placeName);
+    // Afficher l'adresse complète dans la barre de recherche
+    setQuery(item.display_name);
     setShowSuggestions(false);
     setIsFocused(false);
     Keyboard.dismiss();
@@ -191,7 +184,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
         address
       });
       
-      // Afficher le nom du lieu dans la barre de recherche
+      // Afficher l'adresse complète dans la barre de recherche
       setQuery(address);
       
       // Centrer la carte sur le point cliqué
@@ -222,7 +215,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
         address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`
       });
       
-      // Afficher le nom du lieu dans la barre de recherche
+      // Afficher les coordonnées dans la barre de recherche
       setQuery(`${latitude.toFixed(6)}, ${longitude.toFixed(6)}`);
       
       // Faire disparaître le message après 3 secondes
@@ -289,7 +282,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
     } catch {}
   };
 
-  // Obtenir la position actuelle au chargement
+  // Obtenir la position actuelle au chargement (sans afficher dans la barre de recherche)
   useEffect(() => {
     const getCurrentLocationOnLoad = async () => {
       try {
@@ -304,7 +297,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
         };
         setUserLocation(coords);
         
-        // Obtenir l'adresse de la position actuelle
+        // Obtenir l'adresse de la position actuelle (sans l'afficher dans la barre de recherche)
         try {
           const response = await fetch(
             `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&addressdetails=1`,
@@ -318,10 +311,10 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
           const data = await response.json();
           const address = data.display_name || `${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`;
           setCurrentLocationAddress(address);
-          setQuery(address);
+          // Ne pas afficher l'adresse dans la barre de recherche - laisser vide pour la recherche
         } catch (error) {
           setCurrentLocationAddress(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
-          setQuery(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
+          // Ne pas afficher les coordonnées dans la barre de recherche
         }
         
         // Centrer la carte sur la position actuelle
@@ -365,12 +358,12 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
             }]
           }
         ]}>
-          <Text style={styles.searchIcon}>🔎</Text>
+          <MaterialCommunityIcons name="magnify" size={18} color={COLORS.primary} />
         </Animated.View>
         </TouchableOpacity>
         <TextInput
           style={styles.searchInput}
-          placeholder="Rechercher un lieu à Abidjan..."
+          placeholder="Rechercher une adresse de livraison..."
           placeholderTextColor={COLORS.textSecondary}
           value={query}
           onChangeText={setQuery}
@@ -383,7 +376,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
         />
         {!!query && (
           <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-            <Text style={styles.clearBtn}>✕</Text>
+            <MaterialCommunityIcons name="close" size={14} color={COLORS.textSecondary} />
           </TouchableOpacity>
         )}
       </View>
@@ -397,7 +390,7 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
             renderItem={({ item }) => (
               <TouchableOpacity style={styles.resultItem} onPress={() => handleSelect(item)}>
                 <View style={styles.resultIcon}>
-                  <Text style={styles.resultIconText}>📍</Text>
+                  <MaterialCommunityIcons name="map-marker" size={16} color={COLORS.primary} />
                 </View>
                 <View style={styles.resultContent}>
                   <Text numberOfLines={1} style={styles.resultTitle}>
@@ -459,46 +452,72 @@ const OSMSearchMap: React.FC<OSMSearchMapProps> = ({ initialRegion, fullscreen =
           {clickedLocation && (
             <Marker coordinate={{ latitude: clickedLocation.latitude, longitude: clickedLocation.longitude }} title="Point sélectionné">
               <View style={styles.clickedMarker}>
-                <Text style={styles.clickedMarkerText}>📍</Text>
+                <MaterialCommunityIcons name="map-marker" size={18} color={COLORS.white} />
               </View>
             </Marker>
           )}
         </MapView>
         <TouchableOpacity style={[styles.myLocationButton, isWatching && styles.myLocationButtonActive]} onPress={centerOnUserLocation}>
-          <Text style={styles.myLocationIcon}>{isWatching ? '🎯' : '📍'}</Text>
+          <MaterialCommunityIcons 
+            name={isWatching ? "crosshairs-gps" : "map-marker"} 
+            size={20} 
+            color={isWatching ? COLORS.white : COLORS.textPrimary} 
+          />
         </TouchableOpacity>
         {showLocationCards && clickedLocation && (
-          <View style={styles.clickedLocationInfo}>
-            <Text style={styles.clickedLocationTitle}>Nouvelle adresse sélectionnée</Text>
-            <Text style={styles.clickedLocationAddress} numberOfLines={2}>{clickedLocation.address}</Text>
+          <View style={styles.yangoLocationCard}>
+            <View style={styles.yangoLocationHeader}>
+              <MaterialCommunityIcons name="map-marker" size={20} color={COLORS.primary} />
+              <Text style={styles.yangoLocationTitle}>Adresse sélectionnée</Text>
+            </View>
+            <Text style={styles.yangoLocationAddress} numberOfLines={2}>{clickedLocation.address}</Text>
             <TouchableOpacity 
-              style={styles.confirmButton}
+              style={styles.yangoConfirmButton}
               onPress={() => {
                 if (onLocationSelect) {
                   onLocationSelect(clickedLocation.address, clickedLocation.latitude, clickedLocation.longitude);
                 }
               }}
             >
-              <Text style={styles.confirmButtonText}>Confirmer cette adresse</Text>
+              <Text style={styles.yangoConfirmButtonText}>Confirmer cette adresse</Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.yangoCancelButton}
+              onPress={() => {
+                setClickedLocation(null);
+              }}
+            >
+              <Text style={styles.yangoCancelButtonText}>Choisir une autre adresse</Text>
             </TouchableOpacity>
           </View>
         )}
         
         {showLocationCards && !clickedLocation && currentLocationAddress && (
-          <View style={styles.currentLocationInfo}>
-            <Text style={styles.currentLocationTitle}>Votre position actuelle</Text>
-            <Text style={styles.currentLocationAddress} numberOfLines={2}>{currentLocationAddress}</Text>
+          <View style={styles.yangoLocationCard}>
+            <View style={styles.yangoLocationHeader}>
+              <MaterialCommunityIcons name="crosshairs-gps" size={20} color={COLORS.primary} />
+              <Text style={styles.yangoLocationTitle}>Votre position</Text>
+            </View>
+            <Text style={styles.yangoLocationAddress} numberOfLines={2}>{currentLocationAddress}</Text>
             <TouchableOpacity 
-              style={styles.confirmButton}
+              style={styles.yangoConfirmButton}
               onPress={() => {
                 if (onLocationSelect && userLocation) {
                   onLocationSelect(currentLocationAddress, userLocation.latitude, userLocation.longitude);
                 }
               }}
             >
-              <Text style={styles.confirmButtonText}>Livrer ici</Text>
+              <Text style={styles.yangoConfirmButtonText}>Confirmer cette adresse</Text>
             </TouchableOpacity>
-            <Text style={styles.instructionText}>Ou cliquez sur la carte pour choisir une autre adresse</Text>
+            <TouchableOpacity 
+              style={styles.yangoCancelButton}
+              onPress={() => {
+                setCurrentLocationAddress('');
+                setUserLocation(null);
+              }}
+            >
+              <Text style={styles.yangoCancelButtonText}>Choisir une autre adresse</Text>
+            </TouchableOpacity>
           </View>
         )}
         <View style={styles.attribution} pointerEvents="none">
@@ -558,10 +577,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  searchIcon: {
-    fontSize: 18,
-    color: COLORS.primary,
-  },
   searchInput: {
     flex: 1,
     fontSize: 16,
@@ -574,11 +589,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.lightGray,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  clearBtn: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    fontWeight: '600',
   },
   resultsContainer: {
     maxHeight: 280,
@@ -624,9 +634,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 12,
-  },
-  resultIconText: {
-    fontSize: 16,
   },
   resultContent: {
     flex: 1,
@@ -683,10 +690,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.primary,
     borderColor: COLORS.primary,
   },
-  myLocationIcon: {
-    fontSize: 20,
-    color: COLORS.textPrimary,
-  },
   userDotOuter: {
     width: 26,
     height: 26,
@@ -718,15 +721,12 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
   },
-  clickedMarkerText: {
-    fontSize: 18,
-  },
   clickedLocationInfo: {
     position: 'absolute',
     bottom: 60,
     left: 12,
     right: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -760,7 +760,7 @@ const styles = StyleSheet.create({
     bottom: 60,
     left: 12,
     right: 12,
-    backgroundColor: COLORS.white,
+    backgroundColor: 'rgba(255, 255, 255, 0.95)',
     borderRadius: 12,
     padding: 16,
     borderWidth: 1,
@@ -814,6 +814,108 @@ const styles = StyleSheet.create({
   attributionText: {
     fontSize: 10,
     color: COLORS.textSecondary,
+  },
+  locationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  locationIconContainer: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: COLORS.primary + '15',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  closeLocationButton: {
+    marginLeft: 'auto',
+    padding: 4,
+  },
+  locationActions: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 12,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: COLORS.lightGray,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Styles Yango
+  yangoLocationCard: {
+    position: 'absolute',
+    bottom: 20,
+    left: 16,
+    right: 16,
+    backgroundColor: COLORS.white,
+    borderRadius: 16,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
+  },
+  yangoLocationHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  yangoLocationTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: COLORS.textPrimary,
+    marginLeft: 8,
+  },
+  yangoLocationAddress: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    lineHeight: 20,
+    marginBottom: 20,
+  },
+  yangoConfirmButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    marginBottom: 12,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  yangoConfirmButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  yangoCancelButton: {
+    backgroundColor: 'transparent',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: COLORS.border,
+  },
+  yangoCancelButtonText: {
+    color: COLORS.textSecondary,
+    fontSize: 15,
+    fontWeight: '600',
   },
 });
 

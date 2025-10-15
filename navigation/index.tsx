@@ -6,11 +6,9 @@ import {
   HomeScreen, 
   AuthScreen, 
   PhoneVerificationScreen, 
-  ForgotPasswordScreen, 
   ProfileScreen,
   PackageTrackingScreen,
   HistoryScreen,
-  PackageRegistrationScreen,
   MultiStepPackageRegistrationScreen,
   EvaluationScreen,
   PaymentScreen,
@@ -49,11 +47,6 @@ const AppNavigator: React.FC = () => {
           options={{ headerShown: false }}
         />
         <Stack.Screen 
-          name="ForgotPassword" 
-          component={ForgotPasswordScreen} 
-          options={{ headerShown: false }}
-        />
-        <Stack.Screen 
           name="PhoneVerification" 
           component={PhoneVerificationScreen} 
           options={{ headerShown: false }}
@@ -77,11 +70,6 @@ const AppNavigator: React.FC = () => {
           name="History"
           component={HistoryScreen}
           options={{ title: 'Historique' }}
-        />
-        <Stack.Screen
-          name="PackageRegistration"
-          component={PackageRegistrationScreen}
-          options={{ title: 'Enregistrer colis' }}
         />
         <Stack.Screen
           name="MultiStepPackageRegistration"

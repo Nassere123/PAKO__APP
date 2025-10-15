@@ -1,11 +1,15 @@
 // ============================================================================
 // IMPORTATIONS
 // ============================================================================
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Image } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
+import { OrderService } from '../services/orderService';
+import { OrderData } from '../types/common';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================================================
 // INTERFACES ET TYPES
@@ -45,6 +49,13 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
   // ============================================================================
   
   /**
+   * État pour les commandes en cours
+   */
+  const [inProgressOrders, setInProgressOrders] = useState<OrderData[]>([]);
+  const [deliveredOrders, setDeliveredOrders] = useState<OrderData[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  /**
    * Données d'historique des colis (statiques pour le moment)
    * TODO: Remplacer par des données provenant de l'API
    */
@@ -82,6 +93,47 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
       description: 'Colis déposé à la gare',
     },
   ]);
+
+  /**
+   * Charger les commandes depuis le stockage local
+   */
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadOrders();
+    });
+    
+    loadOrders();
+    
+    return unsubscribe;
+  }, [navigation]);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      
+      // Charger depuis la clé simple
+      const simpleOrders = await AsyncStorage.getItem('@pako_simple_orders');
+      const orders = simpleOrders ? JSON.parse(simpleOrders) : [];
+      
+      console.log('Commandes simples chargées:', orders.length);
+      
+      // Filtrer les commandes en cours et livrées
+      const inProgress = orders.filter((order: any) => 
+        order.status === 'confirmed' || order.status === 'in_transit' || order.status === 'pending'
+      );
+      const delivered = orders.filter((order: any) => order.status === 'delivered');
+      
+      console.log('Commandes en cours:', inProgress.length);
+      console.log('Commandes livrées:', delivered.length);
+      
+      setInProgressOrders(inProgress);
+      setDeliveredOrders(delivered);
+    } catch (error) {
+      console.error('Erreur lors du chargement des commandes:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   // ============================================================================
   // FONCTIONS UTILITAIRES
@@ -149,6 +201,45 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
     </TouchableOpacity>
   );
 
+  /**
+   * Composant de rendu pour une commande
+   * Affiche les informations d'une commande sous forme de carte
+   * @param order - Données de la commande à afficher
+   */
+  const renderOrderItem = ({ order }: { order: any }) => (
+    <TouchableOpacity 
+      style={styles.historyCard}
+      onPress={() => navigation.navigate('PackageTracking', { packageId: order.orderNumber })}
+    >
+      {/* En-tête de la carte avec code du colis et statut */}
+      <View style={styles.historyHeader}>
+        <Text style={styles.packageId}>{order.packageCode || order.orderNumber}</Text>
+        <View style={[styles.statusBadge, { backgroundColor: '#FF9800' }]}>
+          <Text style={styles.statusText}>En cours</Text>
+        </View>
+      </View>
+      
+      {/* Informations détaillées de la commande */}
+      <Text style={styles.destination}>📍 {order.deliveryAddress}</Text>
+      <Text style={styles.description}>
+        {order.description || 'Colis standard'} • {order.deliveryType === 'express' ? 'Express' : 'Standard'}
+      </Text>
+      <Text style={styles.date}>
+        {order.createdAt ? 
+          new Date(order.createdAt).toLocaleDateString('fr-FR', {
+            day: 'numeric',
+            month: 'short',
+            year: 'numeric'
+          }) : 
+          'Date inconnue'
+        }
+      </Text>
+      {order.totalPrice && order.totalPrice > 0 && (
+        <Text style={styles.price}>{order.totalPrice.toLocaleString()} FCFA</Text>
+      )}
+    </TouchableOpacity>
+  );
+
   // ============================================================================
   // CONFIGURATION DES OPTIONS
   // ============================================================================
@@ -160,26 +251,38 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
   const packageOptions = [
     {
       id: 'received',
-      title: '📥 Colis reçus',
+      title: 'COLIS REÇUS',
       description: 'Colis livrés avec succès',
-      count: 3,
+      count: deliveredOrders.length,
       color: '#4CAF50',    // Vert pour les colis reçus
+      iconName: 'checkmark-circle' as keyof typeof Ionicons.glyphMap,
+      iconColor: '#4CAF50',
+      bgColor: 'rgba(76, 175, 80, 0.1)',
       onPress: () => navigation.navigate('PackageList' as any, { category: 'received' })
     },
     {
       id: 'in_transit',
-      title: '🚚 Colis en cours de livraison',
-      description: 'Colis actuellement en transit',
-      count: 2,
+      title: 'COLIS EN COURS',
+      description: 'Colis en transit',
+      count: inProgressOrders.length,
       color: '#FF9800',    // Orange pour les colis en cours
-      onPress: () => navigation.navigate('PackageList' as any, { category: 'in_transit' })
+      iconName: 'cube-outline' as keyof typeof Ionicons.glyphMap,
+      iconColor: '#FF9800',
+      bgColor: 'rgba(255, 152, 0, 0.1)',
+      onPress: () => {
+        // Afficher directement les commandes en cours dans cet écran
+        console.log('Afficher commandes en cours:', inProgressOrders.length);
+      }
     },
     {
       id: 'cancelled',
-      title: '❌ Colis annulés',
+      title: 'COLIS ANNULÉS',
       description: 'Colis annulés ou retournés',
-      count: 1,
+      count: 0, // TODO: Ajouter la logique pour les colis annulés
       color: '#F44336',    // Rouge pour les colis annulés
+      iconName: 'close-circle' as keyof typeof Ionicons.glyphMap,
+      iconColor: '#F44336',
+      bgColor: 'rgba(244, 67, 54, 0.1)',
       onPress: () => navigation.navigate('PackageList' as any, { category: 'cancelled' })
     }
   ];
@@ -202,11 +305,15 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
               <Text style={styles.headerSubtitle}>Gérez vos réservations</Text>
             </View>
           </View>
-          {/* Bouton d'actualisation (actuellement sans fonctionnalité) */}
-          <TouchableOpacity style={styles.refreshButton}>
+          {/* Bouton d'actualisation */}
+          <TouchableOpacity 
+            style={styles.refreshButton}
+            onPress={loadOrders}
+            disabled={loading}
+          >
             <Image 
               source={require('../assets/refresh.png')}
-              style={styles.refreshIcon}
+              style={[styles.refreshIcon, loading && { opacity: 0.5 }]}
               resizeMode="contain"
             />
           </TouchableOpacity>
@@ -224,23 +331,30 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
         </View>
 
         {/* Container des options de navigation vers les différents types de colis */}
-        <View style={styles.optionsContainer}>
+        <View style={styles.optionsGrid}>
           {packageOptions.map((option) => (
             <TouchableOpacity
               key={option.id}
               style={[styles.optionCard, { borderLeftColor: option.color }]}
               onPress={option.onPress}
             >
-              <View style={styles.optionContent}>
+              <View style={styles.optionCardContent}>
+                <View style={styles.optionIconContainer}>
+                  <View style={[styles.iconWrapper, { backgroundColor: option.bgColor }]}>
+                    <Ionicons name={option.iconName} size={28} color={option.iconColor} />
+                  </View>
+                </View>
                 <View style={styles.optionTextContainer}>
                   <Text style={styles.optionTitle}>{option.title}</Text>
                   <Text style={styles.optionDescription}>{option.description}</Text>
                 </View>
-                <View style={[styles.countBadge, { backgroundColor: option.color }]}>
-                  <Text style={styles.countText}>{option.count}</Text>
+                <View style={styles.optionRight}>
+                  <View style={[styles.countBadge, { backgroundColor: option.color }]}>
+                    <Text style={styles.countText}>{option.count}</Text>
+                  </View>
+                  <Ionicons name="chevron-forward" size={20} color="#CCCCCC" style={styles.arrowIcon} />
                 </View>
               </View>
-              <Text style={styles.optionArrow}>›</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -250,11 +364,60 @@ const MyPackagesScreen: React.FC<MyPackagesScreenProps> = ({ navigation }) => {
           <Text style={styles.sectionTitle}>Historique des colis</Text>
           
           <View style={styles.historyListContainer}>
-            {historyItems.map((item) => (
-              <View key={item.id}>
-                {renderHistoryItem({ item })}
+            {loading ? (
+              <Text style={styles.loadingText}>Chargement des commandes...</Text>
+            ) : inProgressOrders.length === 0 && deliveredOrders.length === 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateTitle}>Aucune commande trouvée</Text>
+                <Text style={styles.emptyStateText}>
+                  Créez votre première commande ou testez le système
+                </Text>
+                <TouchableOpacity 
+                  style={styles.trackButton}
+                  onPress={async () => {
+                    // Créer une commande de test
+                    const testOrder = {
+                      id: `test_${Date.now()}`,
+                      orderNumber: `#PAKO-TEST-${Math.floor(Math.random() * 1000)}`,
+                      packageCode: 'PK002',
+                      description: 'Colis standard',
+                      deliveryAddress: 'Cocody, Angré 8ème Tranche, Abidjan',
+                      senderName: 'Test User',
+                      status: 'confirmed',
+                      createdAt: new Date().toISOString(),
+                      totalPrice: 2500,
+                      deliveryType: 'standard',
+                      packages: []
+                    };
+                    
+                    const existingOrders = await AsyncStorage.getItem('@pako_simple_orders');
+                    const orders = existingOrders ? JSON.parse(existingOrders) : [];
+                    orders.push(testOrder);
+                    await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(orders));
+                    
+                    loadOrders();
+                  }}
+                >
+                  <Text style={styles.trackButtonText}>➕ Créer commande test</Text>
+                </TouchableOpacity>
               </View>
-            ))}
+            ) : (
+              <>
+                {/* Afficher les commandes en cours */}
+                {inProgressOrders.map((order) => (
+                  <View key={order.id}>
+                    {renderOrderItem({ order })}
+                  </View>
+                ))}
+                
+                {/* Afficher les commandes livrées */}
+                {deliveredOrders.map((order) => (
+                  <View key={order.id}>
+                    {renderOrderItem({ order })}
+                  </View>
+                ))}
+              </>
+            )}
           </View>
         </View>
 
@@ -377,47 +540,62 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     lineHeight: 22,
   },
-  optionsContainer: {
+  optionsGrid: {
     marginBottom: 30,
   },
   optionCard: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 16,
     padding: 20,
     marginBottom: 16,
     borderWidth: 1,
-    borderColor: COLORS.border,
-    borderLeftWidth: 4,
+    borderColor: '#E0E0E0',
+    borderLeftWidth: 5,
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 2,
+      height: 4,
     },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    elevation: 8,
+    width: '100%',
+    minHeight: 120,
+  },
+  optionCardContent: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  optionContent: {
-    flex: 1,
-    flexDirection: 'row',
+  optionIconContainer: {
+    marginRight: 16,
+  },
+  iconWrapper: {
+    width: 50,
+    height: 50,
+    borderRadius: 12,
+    justifyContent: 'center',
     alignItems: 'center',
   },
   optionTextContainer: {
     flex: 1,
   },
   optionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#2C2C2C',
     marginBottom: 4,
+    letterSpacing: 0.5,
   },
   optionDescription: {
     fontSize: 14,
-    color: COLORS.textSecondary,
+    color: '#666666',
     lineHeight: 18,
+    fontWeight: '400',
+  },
+  optionRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   countBadge: {
     width: 32,
@@ -425,17 +603,23 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 16,
+    marginRight: 12,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   countText: {
     color: COLORS.white,
     fontSize: 14,
-    fontWeight: 'bold',
+    fontWeight: '700',
   },
-  optionArrow: {
-    fontSize: 24,
-    color: COLORS.textSecondary,
-    marginLeft: 16,
+  arrowIcon: {
+    marginLeft: 4,
   },
   helpSection: {
     backgroundColor: COLORS.lightGray,
@@ -528,6 +712,55 @@ const styles = StyleSheet.create({
     color: '#000000',
     marginBottom: 12,
     marginLeft: 4,
+  },
+  loadingText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingVertical: 20,
+    fontStyle: 'italic',
+  },
+  emptyText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    paddingVertical: 40,
+    fontStyle: 'italic',
+  },
+  price: {
+    fontSize: 14,
+    color: COLORS.primary,
+    fontWeight: '600',
+    marginTop: 4,
+  },
+  emptyState: {
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyStateTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: COLORS.textPrimary,
+    marginBottom: 8,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  trackButton: {
+    backgroundColor: COLORS.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+  },
+  trackButtonText: {
+    color: COLORS.white,
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

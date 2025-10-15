@@ -7,6 +7,7 @@ export interface PricingResult {
   basePrice: number;
   packageCount: number;
   multiPackageSurcharge: number;
+  expressCharge: number;
   totalPrice: number;
   pricePerKm: number;
   surchargePercentage: number;
@@ -15,14 +16,16 @@ export interface PricingResult {
 export class PricingCalculator {
   private static readonly PRICE_PER_KM = 500; // FCFA par kilomètre
   private static readonly MULTI_PACKAGE_SURCHARGE_PERCENT = 5; // 5% de supplément
+  private static readonly EXPRESS_CHARGE = 2000; // 2000 FCFA pour livraison express
 
   /**
    * Calcule le prix de livraison basé sur la distance et le nombre de colis
    * @param distanceKm Distance en kilomètres
    * @param packageCount Nombre de colis à livrer
+   * @param isExpress Si true, ajoute 2000 FCFA pour livraison express
    * @returns Détail du calcul de prix
    */
-  static calculateDeliveryPrice(distanceKm: number, packageCount: number): PricingResult {
+  static calculateDeliveryPrice(distanceKm: number, packageCount: number, isExpress: boolean = false): PricingResult {
     // Prix de base basé sur la distance
     const basePrice = Math.round(distanceKm * this.PRICE_PER_KM);
     
@@ -33,14 +36,18 @@ export class PricingCalculator {
     const surchargePercentage = additionalPackages * this.MULTI_PACKAGE_SURCHARGE_PERCENT;
     const multiPackageSurcharge = Math.round((basePrice * surchargePercentage) / 100);
     
+    // Supplément express
+    const expressCharge = isExpress ? this.EXPRESS_CHARGE : 0;
+    
     // Prix total
-    const totalPrice = basePrice + multiPackageSurcharge;
+    const totalPrice = basePrice + multiPackageSurcharge + expressCharge;
 
     return {
       distanceKm: Math.round(distanceKm * 100) / 100, // Arrondir à 2 décimales
       basePrice,
       packageCount,
       multiPackageSurcharge,
+      expressCharge,
       totalPrice,
       pricePerKm: this.PRICE_PER_KM,
       surchargePercentage

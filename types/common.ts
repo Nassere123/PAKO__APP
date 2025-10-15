@@ -77,3 +77,38 @@ export interface VerificationResult {
   message?: string;
   error?: string;
 }
+
+export interface PackageData {
+  packageCode: string;
+  packageDescription: string;
+  packageType: string;
+  specialInstructions: string;
+}
+
+export interface OrderData {
+  id: string;
+  orderNumber: string;
+  senderName: string;
+  senderPhone: string;
+  senderCity: string;
+  senderDistrict: string;
+  receiverName: string;
+  receiverPhone: string;
+  deliveryAddress: string;
+  deliveryLatitude?: number;
+  deliveryLongitude?: number;
+  destinationStation: string;
+  stationLatitude?: number;
+  stationLongitude?: number;
+  distanceKm?: number;
+  deliveryType?: 'standard' | 'express';
+  packageCode?: string;
+  packages: PackageData[];
+  selectedRecipientPhone: string;
+  selectedRecipientName: string;
+  totalPrice?: number;
+  paymentMethod?: string;
+  status: 'pending' | 'confirmed' | 'in_transit' | 'delivered' | 'cancelled';
+  createdAt: Date;
+  updatedAt: Date;
+}

@@ -151,6 +151,40 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         </View>
       </View>
 
+      {/* Image/GIF de présentation avec effets */}
+      <View style={styles.imageContainer}>
+        {/* Cercle décoratif en arrière-plan gauche */}
+        <View style={styles.decorativeCircleLeft} />
+        
+        {/* Cercle décoratif en arrière-plan droit */}
+        <View style={styles.decorativeCircleRight} />
+        
+        {/* Cercle décoratif supplémentaire */}
+        <View style={styles.additionalDecorativeCircle} />
+        
+        {/* Effet de souffle/vitesse */}
+        <View style={styles.speedEffectContainer}>
+          <View style={styles.speedCircle} />
+        </View>
+        
+        {/* GIF sans wrapper */}
+        <Image 
+          source={require('../assets/chemin_pako.gif')} 
+          style={styles.welcomeImage}
+          resizeMode="contain"
+        />
+      </View>
+
+      {/* Section d'accroche */}
+      <View style={styles.catchphraseSection}>
+        <Text style={styles.mainCatchphrase}>
+          Faites-vous livrer, où que vous soyez !
+        </Text>
+        <Text style={styles.subCatchphrase}>
+          Depuis la gare routière jusqu'à votre point de livraison, on s'occupe de tout. Suivez votre colis en temps réel, recevez-le sans bouger.
+        </Text>
+      </View>
+
       {/* Boutons d'action principaux */}
       <View style={styles.actionButtons}>
         <TouchableOpacity 
@@ -1045,25 +1079,120 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   notificationButton: {
+    position: 'relative',
     padding: 8,
-    marginLeft: 8,
   },
   notificationIcon: {
     width: 24,
     height: 24,
-    tintColor: COLORS.primary,
+    tintColor: COLORS.textSecondary,
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    backgroundColor: '#FF4444',
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   imageContainer: {
     width: '100%',
-    height: 400,
-    position: 'relative',
-    borderRadius: 0,
-    overflow: 'hidden',
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 30,
+    marginTop: 10,
     marginBottom: 0,
+    position: 'relative',
   },
   welcomeImage: {
-    width: '100%',
+    width: '85%',
     height: '100%',
+    maxHeight: 280,
+    zIndex: 2,
+  },
+  decorativeCircleLeft: {
+    position: 'absolute',
+    left: -50,
+    top: 20,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: COLORS.primary,
+    opacity: 0.08,
+    zIndex: 1,
+  },
+  decorativeCircleRight: {
+    position: 'absolute',
+    right: -40,
+    bottom: 30,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: '#FF8C42',
+    opacity: 0.1,
+    zIndex: 1,
+  },
+  speedEffectContainer: {
+    position: 'absolute',
+    right: 15,
+    top: 35,
+    zIndex: 1,
+    width: 40,
+    height: 80,
+  },
+  speedCircle: {
+    position: 'absolute',
+    backgroundColor: COLORS.primary,
+    opacity: 0.08,
+    borderRadius: 60,
+    width: 120,
+    height: 120,
+    top: 20,
+    right: -50,
+    zIndex: 1,
+  },
+  additionalDecorativeCircle: {
+    position: 'absolute',
+    left: -40,
+    top: 240,
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#FF8C42',
+    opacity: 0.08,
+    zIndex: 1,
+  },
+  catchphraseSection: {
+    paddingHorizontal: 25,
+    paddingVertical: 15,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  mainCatchphrase: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    textAlign: 'center',
+    marginBottom: 12,
+    lineHeight: 32,
+    fontFamily: 'Rubik-Bold',
+  },
+  subCatchphrase: {
+    fontSize: 15,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 5,
+    fontFamily: 'Rubik-Regular',
   },
   imageOverlay: {
     position: 'absolute',

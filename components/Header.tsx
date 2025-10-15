@@ -73,10 +73,7 @@ const Header: React.FC<HeaderProps> = ({
               style={styles.iconButton}
               onPress={onNotificationPress}
             >
-              <Image source={require('../assets/notification.png')} style={styles.notificationIcon} resizeMode="contain" />
-              <View style={styles.notificationBadge}>
-                <Text style={styles.badgeText}>3</Text>
-              </View>
+              <Text style={styles.testText}>🔔</Text>
             </TouchableOpacity>
 
             {/* Avatar utilisateur */}
@@ -203,10 +200,9 @@ const styles = StyleSheet.create({
     fontSize: 20,
     color: COLORS.white,
   },
-  notificationIcon: {
-    width: 22,
-    height: 22,
-    tintColor: COLORS.white,
+  testText: {
+    fontSize: 24,
+    color: COLORS.white,
   },
   notificationBadge: {
     position: 'absolute',

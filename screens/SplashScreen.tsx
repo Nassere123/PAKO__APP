@@ -21,8 +21,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const scaleAnim = useRef(new Animated.Value(0.3)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
-  const logoRotateAnim = useRef(new Animated.Value(0)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
+  
+  // Animations pour la transition de fond
+  const backgroundFadeAnim = useRef(new Animated.Value(1)).current;
+  const textColorAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     // Animation de démarrage
@@ -47,20 +50,11 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         }),
       ]).start();
 
-      // Animation de rotation du logo après 500ms
-      setTimeout(() => {
-        Animated.timing(logoRotateAnim, {
-          toValue: 1,
-          duration: 1200,
-          useNativeDriver: true,
-        }).start();
-      }, 500);
-
       // Animation de pulsation continue
       const pulseAnimation = Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
-            toValue: 1.1,
+            toValue: 1.05,
             duration: 1000,
             useNativeDriver: true,
           }),
@@ -73,7 +67,23 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
       );
       pulseAnimation.start();
 
-      // Fin de l'écran de démarrage après 5 secondes
+      // Transition après 2 secondes : fond orange vers blanc, texte blanc vers orange
+      setTimeout(() => {
+        Animated.parallel([
+          Animated.timing(backgroundFadeAnim, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: false, // Pour les couleurs
+          }),
+          Animated.timing(textColorAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: false, // Pour les couleurs
+          }),
+        ]).start();
+      }, 2000);
+
+      // Fin de l'écran de démarrage après 4 secondes
       setTimeout(() => {
         // Animation de sortie
         Animated.parallel([
@@ -90,32 +100,49 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
         ]).start(() => {
           onFinish();
         });
-      }, 5000);
+      }, 4000);
     };
 
     startAnimations();
-  }, [fadeAnim, scaleAnim, slideAnim, logoRotateAnim, pulseAnim, onFinish]);
+  }, [fadeAnim, scaleAnim, slideAnim, pulseAnim, backgroundFadeAnim, textColorAnim, onFinish]);
 
-  const logoRotation = logoRotateAnim.interpolate({
+  // Interpolation pour la couleur du texte (blanc vers orange)
+  const textColor = textColorAnim.interpolate({
     inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
+    outputRange: [COLORS.white, COLORS.primary],
   });
 
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor={COLORS.primary} barStyle="light-content" />
       
-      {/* Fond image Light Orange + logo */}
-      <Image
-        source={require('../assets/Light Orange.jpg')}
-        style={styles.backgroundImage}
-        resizeMode="cover"
-      />
-      <Image
-        source={require('../assets/PAKO APP.png')}
-        style={styles.logoImage}
-        resizeMode="contain"
-      />
+      {/* Fond blanc */}
+      <View style={styles.whiteBackground} />
+      
+      {/* Fond image Light Orange avec fade */}
+      <Animated.View style={[styles.backgroundContainer, { opacity: backgroundFadeAnim }]}>
+        <Image
+          source={require('../assets/Light Orange.jpg')}
+          style={styles.backgroundImage}
+          resizeMode="cover"
+        />
+      </Animated.View>
+      
+      {/* Texte PAKO au centre */}
+      <Animated.View
+        style={[
+          styles.logoContainer,
+          {
+            opacity: fadeAnim,
+            transform: [
+              { scale: Animated.multiply(scaleAnim, pulseAnim) },
+              { translateY: slideAnim },
+            ],
+          },
+        ]}
+      >
+        <Animated.Text style={[styles.title, { color: textColor }]}>PAKO</Animated.Text>
+      </Animated.View>
     </View>
   );
 };
@@ -123,25 +150,32 @@ const SplashScreen: React.FC<SplashScreenProps> = ({ onFinish }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.white,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  background: {
+  whiteBackground: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.white,
   },
-  content: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    flex: 1,
+  backgroundContainer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  backgroundImage: {
+    width: '100%',
+    height: '100%',
   },
   logoContainer: {
-    marginBottom: 30,
+    alignItems: 'center',
+    justifyContent: 'center',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -151,28 +185,14 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 8,
   },
-  logoImage: {
-    width: 280,
-    height: 280,
-    backgroundColor: 'transparent',
-  },
-  backgroundImage: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    width: '100%',
-    height: '100%',
-  },
   title: {
-    fontSize: 48,
+    fontSize: 72,
     fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 10,
+    letterSpacing: 8,
     textShadowColor: 'rgba(0, 0, 0, 0.3)',
     textShadowOffset: { width: 0, height: 2 },
     textShadowRadius: 4,
+    fontFamily: 'System',
   },
   subtitle: {
     fontSize: 18,
