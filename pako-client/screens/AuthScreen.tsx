@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -110,17 +110,34 @@ const AuthScreen: React.FC<AuthScreenProps> = ({ navigation, route }) => {
       }
     } catch (error: any) {
       setLoading(false);
-      console.log('Erreur détaillée:', error);
+      console.log('=== ERREUR COMPLÈTE ===');
+      console.log('Message:', error.message);
+      console.log('Code:', error.code);
+      console.log('Response:', error.response?.data);
+      console.log('URL:', error.config?.url);
+      console.log('BaseURL:', error.config?.baseURL);
+      console.log('========================');
       
       // Gestion des erreurs plus spécifique
-      if (error.code === 'ECONNREFUSED') {
-        showError('Erreur de connexion', 'Le serveur backend n\'est pas accessible. Vérifiez que le serveur est démarré sur le port 3000.');
-      } else if (error.message?.includes('Network Error')) {
-        showError('Erreur réseau', 'Impossible de se connecter au serveur. En mode développement, l\'inscription fonctionnera avec simulation.');
-      } else if (error.message?.includes('timeout')) {
+      if (error.code === 'ECONNREFUSED' || error.message?.includes('connect ECONNREFUSED')) {
+        showError(
+          'Erreur de connexion', 
+          'Le serveur backend n\'est pas accessible.\n\n' +
+          'Vérifiez que:\n' +
+          '1. Le serveur backend est démarré (cd "BACK END" && npm run start:dev)\n' +
+          '2. Le serveur écoute sur http://192.168.1.5:3000\n' +
+          '3. Votre téléphone/émulateur est sur le même réseau Wi-Fi'
+        );
+      } else if (error.message?.includes('Network Error') || error.message?.includes('ERR_NETWORK')) {
+        showError(
+          'Erreur réseau', 
+          'Impossible de se connecter au serveur.\n\n' +
+          'Vérifiez votre connexion réseau et que le serveur est bien démarré.'
+        );
+      } else if (error.message?.includes('timeout') || error.message?.includes('TIMEOUT')) {
         showError('Timeout', 'Le serveur met trop de temps à répondre. Vérifiez votre connexion.');
       } else {
-        showError('Erreur', 'Erreur de connexion au serveur: ' + (error.message || 'Erreur inconnue'));
+        showError('Erreur', 'Erreur de connexion: ' + (error.message || 'Erreur inconnue'));
       }
     }
   };

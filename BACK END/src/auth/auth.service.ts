@@ -37,6 +37,11 @@ export class AuthService {
     // Vérifier si l'utilisateur existe
     let user = await this.usersService.findByPhone(phone);
     
+    console.log('User exists:', !!user);
+    if (user) {
+      console.log('User status:', user.status);
+    }
+    
     if (user) {
       // Vérifier les tentatives OTP
       if (user.otpAttempts <= 0 && user.lastOtpAttempt && 
@@ -65,40 +70,28 @@ export class AuthService {
       // Récupérer l'utilisateur avec les données mises à jour
       user = await this.userRepository.findOne({ where: { id: user.id } });
     } else {
-      // Vérifier si un utilisateur avec le même numéro ET les mêmes noms existe déjà
-      const existingUserWithSameNames = await this.userRepository.findOne({
-        where: { 
-          phone,
-          firstName: firstName && firstName.trim() !== '' ? firstName.trim() : '',
-          lastName: lastName && lastName.trim() !== '' ? lastName.trim() : ''
-        }
+      // Pour les nouveaux utilisateurs, créer un utilisateur temporaire avec le code OTP
+      // Cet utilisateur sera conservé et complété lors de l'inscription
+      console.log('📝 Création d\'un utilisateur temporaire pour inscription');
+      console.log(`   Téléphone: ${phone}`);
+      console.log(`   Nom: ${firstName} ${lastName}`);
+      console.log(`   Code OTP: ${otpCode}`);
+      
+      // Créer un utilisateur temporaire
+      const newUser = await this.userRepository.save({
+        firstName: firstName && firstName.trim() !== '' ? firstName.trim() : '',
+        lastName: lastName && lastName.trim() !== '' ? lastName.trim() : '',
+        phone,
+        otpCode,
+        otpExpires: expiresAt,
+        otpAttempts: 3,
+        lastOtpAttempt: new Date(),
+        userType: UserType.CUSTOMER,
+        status: UserStatus.INACTIVE,
+        isVerified: false,
       });
-
-      if (existingUserWithSameNames) {
-        // Mettre à jour l'utilisateur existant avec le nouveau code OTP
-        await this.userRepository.update(existingUserWithSameNames.id, {
-          otpCode,
-          otpExpires: expiresAt,
-          firstName: firstName && firstName.trim() !== '' ? firstName.trim() : existingUserWithSameNames.firstName,
-          lastName: lastName && lastName.trim() !== '' ? lastName.trim() : existingUserWithSameNames.lastName,
-          otpAttempts: 3,
-          lastOtpAttempt: new Date(),
-        });
-        user = await this.userRepository.findOne({ where: { id: existingUserWithSameNames.id } });
-      } else {
-        // Ne pas créer d'utilisateur ici - seulement stocker temporairement les données
-        // L'utilisateur sera créé lors de l'inscription (register)
-        console.log('📝 Utilisateur non trouvé - données temporaires stockées pour inscription');
-        console.log(`   Téléphone: ${phone}`);
-        console.log(`   Nom: ${firstName} ${lastName}`);
-        console.log(`   Code OTP: ${otpCode}`);
-        
-        // Retourner les informations sans créer d'utilisateur
-        return {
-          message: `Code de vérification envoyé au ${phone}`,
-          expiresIn: 600 // 10 minutes
-        };
-      }
+      
+      user = newUser;
     }
 
     // TODO: Envoyer le SMS avec le code OTP
@@ -132,9 +125,35 @@ export class AuthService {
   async verifyCode(verifyOtpDto: VerifyOtpDto): Promise<{ message: string; user: Partial<User> }> {
     const { phone, code } = verifyOtpDto;
     
+    // Debug: Afficher les données reçues
+    console.log('=== DEBUG VERIFY OTP ===');
+    console.log('Phone:', phone);
+    console.log('Code:', code);
+    console.log('========================');
+    
     const user = await this.userRepository.findOne({
       where: { phone, otpCode: code }
     });
+
+    // Debug: Afficher l'état de la recherche
+    console.log('=== DEBUG USER SEARCH ===');
+    console.log('User found:', !!user);
+    if (user) {
+      console.log('User ID:', user.id);
+      console.log('OTP Code stored:', user.otpCode);
+      console.log('OTP Code received:', code);
+      console.log('OTP Expires:', user.otpExpires);
+      console.log('Current time:', new Date());
+      console.log('Is OTP expired:', user.otpExpires && user.otpExpires < new Date());
+    } else {
+      // Chercher tous les utilisateurs avec ce numéro pour déboguer
+      const allUsersWithPhone = await this.userRepository.find({ where: { phone } });
+      console.log('Users with this phone:', allUsersWithPhone.length);
+      allUsersWithPhone.forEach(u => {
+        console.log(`  - User ${u.id}: OTP=${u.otpCode}, Expires=${u.otpExpires}`);
+      });
+    }
+    console.log('=========================');
 
     if (!user || !user.otpExpires || user.otpExpires < new Date()) {
       throw new BadRequestException('Code OTP invalide ou expiré');
@@ -150,9 +169,10 @@ export class AuthService {
       otpAttempts: user.otpAttempts - 1,
     });
 
-    // Marquer comme vérifié
+    // Marquer comme vérifié et activer le compte
     await this.userRepository.update(user.id, {
       isVerified: true,
+      status: UserStatus.ACTIVE, // Activer le compte lors de la vérification OTP
       otpCode: null,
       otpExpires: null,
     });
@@ -172,27 +192,45 @@ export class AuthService {
   async register(registerDto: RegisterDto): Promise<{ message: string; user: Partial<User> }> {
     const { firstName, lastName, phone, email } = registerDto;
 
-    // Vérifier si un utilisateur avec le même numéro ET les mêmes noms existe déjà
+    // Normaliser les noms (supprimer les espaces)
+    const normalizedFirstName = firstName?.trim() || '';
+    const normalizedLastName = lastName?.trim() || '';
+
+    console.log('=== DEBUG REGISTER ===');
+    console.log('Phone:', phone);
+    console.log('Normalized firstName:', normalizedFirstName);
+    console.log('Normalized lastName:', normalizedLastName);
+    console.log('Email:', email);
+    console.log('======================');
+
+    // Chercher un utilisateur existant par numéro de téléphone
     const existingUser = await this.userRepository.findOne({
-      where: { 
-        phone, 
-        firstName, 
-        lastName 
-      }
+      where: { phone }
     });
+
+    console.log('Existing user found:', !!existingUser);
+    if (existingUser) {
+      console.log('Existing user status:', existingUser.status);
+      console.log('Existing user firstName:', existingUser.firstName);
+      console.log('Existing user lastName:', existingUser.lastName);
+    }
 
     if (existingUser) {
       // Mettre à jour l'utilisateur existant avec les nouvelles données
       await this.userRepository.update(existingUser.id, {
-        email,
-        status: UserStatus.ACTIVE,
+        firstName: normalizedFirstName || existingUser.firstName,
+        lastName: normalizedLastName || existingUser.lastName,
+        email: email || existingUser.email,
+        status: UserStatus.ACTIVE, // Activer le compte
         isVerified: true,
       });
       
       const updatedUser = await this.usersService.findOne(existingUser.id);
       
+      console.log('User updated, status:', updatedUser.status);
+      
       return {
-        message: 'Compte mis à jour avec succès',
+        message: 'Compte activé avec succès',
         user: {
           id: updatedUser.id,
           firstName: updatedUser.firstName,
@@ -204,10 +242,10 @@ export class AuthService {
         }
       };
     } else {
-      // Créer un nouvel utilisateur (même numéro mais noms différents)
+      // Créer un nouvel utilisateur
       const newUser = await this.userRepository.save({
-        firstName,
-        lastName,
+        firstName: normalizedFirstName,
+        lastName: normalizedLastName,
         phone,
         email,
         userType: UserType.CUSTOMER,
@@ -215,6 +253,8 @@ export class AuthService {
         isVerified: true,
         otpAttempts: 3,
       });
+
+      console.log('New user created, status:', newUser.status);
 
       return {
         message: 'Compte créé avec succès',
@@ -234,6 +274,11 @@ export class AuthService {
   async login(loginDto: LoginDto): Promise<{ access_token: string; user: Partial<User> }> {
     const { phone, otpCode } = loginDto;
 
+    console.log('=== DEBUG LOGIN ===');
+    console.log('Phone:', phone);
+    console.log('OTP Code:', otpCode);
+    console.log('===================');
+
     // Trouver l'utilisateur avec le code OTP correspondant
     const user = await this.userRepository.findOne({
       where: { 
@@ -242,17 +287,29 @@ export class AuthService {
       }
     });
 
-    if (!user || !user.isVerified) {
-      throw new UnauthorizedException('Utilisateur non trouvé ou non vérifié');
+    console.log('User found:', !!user);
+    if (user) {
+      console.log('User status:', user.status);
+      console.log('User isVerified:', user.isVerified);
+      console.log('OTP expires:', user.otpExpires);
+      console.log('Current time:', new Date());
+    }
+
+    if (!user) {
+      throw new UnauthorizedException('Utilisateur non trouvé ou code OTP invalide');
     }
 
     // Vérifier le code OTP
     if (!user.otpExpires || user.otpExpires < new Date()) {
-      throw new UnauthorizedException('Code OTP invalide ou expiré');
+      throw new UnauthorizedException('Code OTP expiré');
     }
 
+    // Si le compte est inactif, l'activer automatiquement si le code OTP est valide
     if (user.status !== UserStatus.ACTIVE) {
-      throw new UnauthorizedException('Compte inactif');
+      console.log('Compte inactif détecté, activation automatique...');
+      await this.userRepository.update(user.id, {
+        status: UserStatus.ACTIVE,
+      });
     }
 
     // Nettoyer le code OTP après connexion réussie

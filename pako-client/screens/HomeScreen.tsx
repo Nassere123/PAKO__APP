@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Image, Animated, Modal } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { HomeScreenProps } from '../types';
 import { COLORS } from '../constants';
 import OSMSearchMap from '../components/OSMSearchMap';
@@ -141,14 +142,30 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       console.log('=== DÉBUT DU PROCESSUS DE COMMANDE ===');
       console.log('Utilisateur connecté:', user);
       
-      if (!user?.id) {
+      if (!user?.id || !user?.phone) {
         console.log('❌ Utilisateur non connecté');
         return;
       }
 
+      // Récupérer l'UUID backend si nécessaire
+      let customerId = user.id;
+      if (!user.id.includes('-')) {
+        console.log('⚠️ ID local détecté, récupération de l\'UUID...');
+        try {
+          const { AuthService } = await import('../services/authService');
+          const userResult = await AuthService.getUserByPhone(user.phone);
+          if (userResult.success && userResult.user?.id) {
+            customerId = userResult.user.id;
+            console.log('✅ UUID récupéré:', customerId);
+          }
+        } catch (error) {
+          console.log('⚠️ Erreur récupération UUID:', error);
+        }
+      }
+
       // Appeler le backend pour signaler le début du processus
       await OrderService.startOrderProcess(
-        user.id, 
+        customerId, 
         `${user.firstName} ${user.lastName}`
       );
 
@@ -170,10 +187,6 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       <View style={styles.homeHeader}>
         <View style={styles.logoContainer}>
           <Text style={styles.logoText}>PAKO</Text>
-          <TouchableOpacity style={styles.locationContainer}>
-            <Text style={styles.locationText}>Votre position</Text>
-            <Text style={styles.locationArrow}>›</Text>
-          </TouchableOpacity>
         </View>
         <View style={styles.rightButtonsContainer}>
           <TouchableOpacity 
@@ -1091,19 +1104,8 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
   locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: 4,
-  },
-  locationText: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    fontFamily: 'Rubik-Regular',
-  },
-  locationArrow: {
-    fontSize: 16,
-    color: COLORS.textPrimary,
-    marginLeft: 4,
+    alignSelf: 'flex-start',
   },
   rightButtonsContainer: {
     flexDirection: 'row',

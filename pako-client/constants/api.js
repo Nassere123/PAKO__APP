@@ -3,9 +3,12 @@ const getBaseURL = () => {
   // Détection automatique de l'environnement
   if (__DEV__) {
     // Pour Expo Go, utiliser l'IP locale de votre machine
-    // Remplacez 192.168.1.100 par l'IP de votre machine sur le réseau local
-    return 'http://192.168.1.17:3000'; // IP locale pour Expo Go
-    // Alternative: 'http://10.0.2.2:3000' pour émulateur Android natif
+    // IP Wi-Fi actuelle: 192.168.1.5
+    // Alternatives pour différents environnements:
+    // - 'http://10.0.2.2:3000' pour émulateur Android natif
+    // - 'http://localhost:3000' pour iOS Simulator
+    // - 'http://192.168.1.5:3000' pour Expo Go sur le même réseau Wi-Fi
+    return 'http://192.168.1.5:3000'; // IP Wi-Fi actuelle
   }
   return 'https://api.pako.com'; // Production
 };

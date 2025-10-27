@@ -89,7 +89,37 @@ JWT_SECRET=your-secret-key
 ```
 
 ### Configuration API
-Modifiez `pako-client/constants/api.js` pour l'URL de l'API.
+
+**Important** : Modifiez `pako-client/constants/api.js` avec votre adresse IP Wi-Fi :
+
+```javascript
+const getBaseURL = () => {
+  if (__DEV__) {
+    return 'http://192.168.1.5:3000'; // ← Remplacez par VOTRE IP
+  }
+  return 'https://api.pako.com';
+};
+```
+
+**Comment trouver votre IP :**
+- Windows : `ipconfig` → Adresse IPv4 de la carte Wi-Fi
+- Mac/Linux : `ifconfig` → inet de la carte Wi-Fi
+
+## ⚠️ Résolution des Problèmes de Connexion
+
+Si vous rencontrez l'erreur **"Network Error"** lors du login :
+
+1. **Vérifiez que le backend est démarré** :
+   ```bash
+   cd "BACK END"
+   npm run start:dev
+   ```
+
+2. **Vérifiez l'adresse IP** dans `pako-client/constants/api.js`
+
+3. **Assurez-vous d'être sur le même réseau Wi-Fi** que votre machine
+
+4. **Pour plus de détails**, consultez le fichier `pako-client/TROUBLESHOOTING.md`
 
 ## 📝 Documentation API
 

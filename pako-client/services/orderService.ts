@@ -8,7 +8,12 @@ export interface OrderData {
   customerId: string;
   destinationStation: string;
   deliveryAddress: string;
+  deliveryLatitude?: number;
+  deliveryLongitude?: number;
   pickupAddress: string;
+  stationLatitude?: number;
+  stationLongitude?: number;
+  distanceKm?: number;
   receiverPhone: string;
   senderPhone: string;
   deliveryType: 'standard' | 'express';
@@ -52,10 +57,11 @@ export class OrderService {
   static async createOrder(orderData: OrderData, customerId: string): Promise<any> {
     try {
       console.log('=== DEBUG OrderService.createOrder ===');
-      console.log('Données à envoyer:', orderData);
+      console.log('Données à envoyer:', JSON.stringify(orderData, null, 2));
       console.log('Customer ID (local):', customerId);
       console.log('Type d\'ID:', typeof customerId);
       console.log('URL de l\'API:', `${API_CONFIG.BASE_URL}/orders/with-packages`);
+      console.log('BASE_URL:', API_CONFIG.BASE_URL);
 
       // Si l'ID est numérique, récupérer l'utilisateur existant par téléphone
       let backendCustomerId = customerId;
@@ -97,7 +103,12 @@ export class OrderService {
         customerId: backendCustomerId,
         destinationStation: orderData.destinationStation,
         deliveryAddress: orderData.deliveryAddress,
+        deliveryLatitude: orderData.deliveryLatitude,
+        deliveryLongitude: orderData.deliveryLongitude,
         pickupAddress: orderData.pickupAddress,
+        stationLatitude: orderData.stationLatitude,
+        stationLongitude: orderData.stationLongitude,
+        distanceKm: orderData.distanceKm,
         receiverPhone: orderData.receiverPhone,
         senderPhone: orderData.senderPhone,
         deliveryType: orderData.deliveryType,
@@ -129,11 +140,17 @@ export class OrderService {
       }
 
       const result = await response.json();
-      console.log('Commande créée avec succès:', result);
+      console.log('✅ Commande créée avec succès:', result);
       
       return result;
-    } catch (error) {
-      console.error('Erreur lors de la création de la commande:', error);
+    } catch (error: any) {
+      console.error('❌ ERREUR COMPLÈTE OrderService.createOrder:');
+      console.error('Message:', error.message);
+      console.error('Code:', error.code);
+      console.error('Response:', error.response?.data);
+      console.error('URL:', error.config?.url);
+      console.error('BaseURL:', error.config?.baseURL);
+      console.error('Stack:', error.stack);
       throw error;
     }
   }

@@ -22,9 +22,14 @@ export class CreatePackageDto {
 }
 
 export class CreateOrderDto {
-  @ApiProperty({ description: 'ID du client' })
-  @IsUUID()
+  @ApiProperty({ description: 'ID du client (UUID) ou téléphone de l\'utilisateur' })
+  @IsString()
   customerId: string;
+
+  @ApiProperty({ description: 'Nom complet du client', required: false })
+  @IsOptional()
+  @IsString()
+  customerName?: string;
 
   // === INFORMATIONS ESSENTIELLES ===
   
@@ -36,9 +41,34 @@ export class CreateOrderDto {
   @IsString()
   deliveryAddress: string;
 
+  @ApiProperty({ description: 'Latitude du lieu de livraison', required: false })
+  @IsOptional()
+  @IsNumber()
+  deliveryLatitude?: number;
+
+  @ApiProperty({ description: 'Longitude du lieu de livraison', required: false })
+  @IsOptional()
+  @IsNumber()
+  deliveryLongitude?: number;
+
   @ApiProperty({ description: 'Lieu d\'origine du colis (adresse de prise)', example: 'Abidjan, Plateau' })
   @IsString()
   pickupAddress: string;
+
+  @ApiProperty({ description: 'Latitude de la gare de destination', required: false })
+  @IsOptional()
+  @IsNumber()
+  stationLatitude?: number;
+
+  @ApiProperty({ description: 'Longitude de la gare de destination', required: false })
+  @IsOptional()
+  @IsNumber()
+  stationLongitude?: number;
+
+  @ApiProperty({ description: 'Distance en kilomètres', required: false })
+  @IsOptional()
+  @IsNumber()
+  distanceKm?: number;
 
   @ApiProperty({ description: 'Téléphone du destinataire', example: '+225076543210' })
   @IsString()

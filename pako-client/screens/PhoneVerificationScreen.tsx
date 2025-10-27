@@ -88,6 +88,16 @@ const PhoneVerificationScreen: React.FC<PhoneVerificationScreenProps> = ({ navig
           
           if (registerResult.success) {
             setLoading(false);
+            
+            // Sauvegarder l'utilisateur avec l'ID UUID du backend
+            await login({
+              id: registerResult.user.id, // ID UUID du backend
+              firstName: registerResult.user.firstName,
+              lastName: registerResult.user.lastName,
+              phone: registerResult.user.phone,
+              email: registerResult.user.email,
+            });
+            
             navigation.navigate('Welcome', {
               firstName: firstName || '',
               lastName: lastName || '',

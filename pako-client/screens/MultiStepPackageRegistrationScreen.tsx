@@ -924,7 +924,12 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         customerId: user.id,
         destinationStation: orderData.destinationStation,
         deliveryAddress: orderData.deliveryAddress,
+        deliveryLatitude: orderData.deliveryLatitude,
+        deliveryLongitude: orderData.deliveryLongitude,
         pickupAddress: `${orderData.senderCity}, ${orderData.senderDistrict}`, // Lieu d'origine
+        stationLatitude: orderData.stationLatitude,
+        stationLongitude: orderData.stationLongitude,
+        distanceKm: orderData.distanceKm,
         receiverPhone: orderData.selectedRecipientPhone || orderData.receiverPhone,
         senderPhone: orderData.senderPhone,
         deliveryType: orderData.deliveryType || 'standard',
@@ -1414,16 +1419,97 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
     setShowMapModal(false);
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     if (!validateCurrentStep()) return;
     
     setLoading(true);
     
-    // Simulation d'enregistrement
-    setTimeout(() => {
-      setLoading(false);
+    try {
+      console.log('🎯 === DÉBUT handleSubmit ===');
+      console.log('Utilisateur:', user);
+      console.log('Données de commande:', orderData);
+      console.log('Informations de prix:', pricingInfo);
+      
+      if (!user?.id || !user?.phone) {
+        console.log('❌ Utilisateur non connecté - arrêt du processus');
+        Alert.alert('Erreur', 'Utilisateur non connecté');
+        return;
+      }
+      
+      // Récupérer l'UUID backend si nécessaire
+      let customerId = user.id;
+      
+      // Si l'ID est un timestamp local, récupérer l'UUID backend
+      if (!user.id.includes('-')) { // UUID contient toujours des tirets
+        console.log('⚠️ ID local détecté, récupération de l\'UUID backend...');
+        try {
+          const { AuthService } = await import('../services/authService');
+          const userResult = await AuthService.getUserByPhone(user.phone);
+          if (userResult.success && userResult.user?.id) {
+            customerId = userResult.user.id;
+            console.log('✅ UUID backend récupéré:', customerId);
+          } else {
+            console.log('⚠️ Impossible de récupérer l\'UUID, utilisation de l\'ID local');
+          }
+        } catch (error) {
+          console.log('⚠️ Erreur lors de la récupération de l\'UUID:', error);
+          // Continuer avec l'ID local
+        }
+      } else {
+        console.log('✅ UUID backend déjà présent:', customerId);
+      }
+      
+      // Déterminer le numéro du destinataire
+      let receiverPhoneValue = orderData.selectedRecipientPhone || orderData.receiverPhone;
+      
+      // Si le destinataire est "Moi", utiliser le numéro de l'utilisateur connecté
+      if (orderData.selectedRecipientName === 'Moi' && user?.phone) {
+        receiverPhoneValue = user.phone;
+      }
+
+      // Préparer les données pour l'API backend avec la structure simplifiée
+      const orderDataForBackend = {
+        customerId,
+        destinationStation: orderData.destinationStation,
+        deliveryAddress: orderData.deliveryAddress,
+        deliveryLatitude: orderData.deliveryLatitude,
+        deliveryLongitude: orderData.deliveryLongitude,
+        pickupAddress: `${orderData.senderCity}, ${orderData.senderDistrict}`,
+        stationLatitude: orderData.stationLatitude,
+        stationLongitude: orderData.stationLongitude,
+        distanceKm: orderData.distanceKm,
+        receiverPhone: receiverPhoneValue,
+        senderPhone: orderData.senderPhone,
+        deliveryType: orderData.deliveryType || 'standard',
+        paymentMethod: orderData.paymentMethod || 'cash',
+        packages: orderData.packages.map(pkg => ({
+          packageCode: pkg.packageCode,
+        })),
+        totalPrice: pricingInfo?.totalPrice || 0,
+      };
+
+      console.log('=== DONNÉES POUR LE BACKEND ===');
+      console.log('Structure simplifiée:', orderDataForBackend);
+
+      // Appeler l'API backend
+      console.log('🚀 Appel de OrderService.createOrder...');
+      console.log('📋 Customer ID envoyé:', customerId);
+      const createdOrder = await OrderService.createOrder(orderDataForBackend, customerId);
+      console.log('✅ OrderService.createOrder terminé avec succès');
+      console.log('Commande créée:', createdOrder);
+
+      // Afficher le modal de succès
       showSuccessModalPopup();
-    }, 2000);
+    } catch (error) {
+      console.error('❌ Erreur lors de la création de la commande:', error);
+      Alert.alert(
+        'Erreur',
+        'Une erreur est survenue lors de la validation de votre commande. Veuillez réessayer.',
+        [{ text: 'OK' }]
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   const renderProgressIndicator = () => (

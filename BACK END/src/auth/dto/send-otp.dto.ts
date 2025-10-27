@@ -5,7 +5,7 @@ export class SendOtpDto {
   @ApiProperty({ 
     description: 'Numéro de téléphone au format international',
     example: '+2250701234567',
-    pattern: '^\\+225\\d{8}$'
+    pattern: '^\\+225\\d{10}$'
   })
   @IsString()
   @IsNotEmpty()

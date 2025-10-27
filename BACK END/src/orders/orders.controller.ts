@@ -16,6 +16,13 @@ export class OrdersController {
     return this.ordersService.findAll();
   }
 
+  @Post('start-order-process')
+  @ApiOperation({ summary: 'Démarrer le processus de commande' })
+  @ApiResponse({ status: 200, description: 'Processus de commande démarré' })
+  startOrderProcess(@Body() body: { customerId: string; customerName?: string }) {
+    return this.ordersService.startOrderProcess(body.customerId, body.customerName);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Récupérer une commande par ID' })
   @ApiResponse({ status: 200, description: 'Commande trouvée', type: Order })

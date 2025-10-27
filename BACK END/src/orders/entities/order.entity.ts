@@ -29,9 +29,13 @@ export class Order {
   @Column({ type: 'varchar', length: 20, unique: true })
   orderNumber: string;
 
-  @ApiProperty({ description: 'ID du client' })
-  @Column({ type: 'uuid' })
+  @ApiProperty({ description: 'ID du client (UUID ou téléphone)' })
+  @Column({ type: 'varchar' })
   customerId: string;
+
+  @ApiProperty({ description: 'Nom complet du client qui a passé la commande' })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  customerName?: string;
 
   // === INFORMATIONS ESSENTIELLES ===
   
@@ -43,9 +47,29 @@ export class Order {
   @Column({ type: 'text' })
   deliveryAddress: string;
 
+  @ApiProperty({ description: 'Latitude du lieu de livraison' })
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  deliveryLatitude?: number;
+
+  @ApiProperty({ description: 'Longitude du lieu de livraison' })
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  deliveryLongitude?: number;
+
   @ApiProperty({ description: 'Lieu d\'origine du colis (adresse de prise)' })
   @Column({ type: 'text' })
   pickupAddress: string;
+
+  @ApiProperty({ description: 'Latitude de la gare de destination' })
+  @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
+  stationLatitude?: number;
+
+  @ApiProperty({ description: 'Longitude de la gare de destination' })
+  @Column({ type: 'decimal', precision: 11, scale: 8, nullable: true })
+  stationLongitude?: number;
+
+  @ApiProperty({ description: 'Distance en kilomètres entre la gare et le lieu de livraison' })
+  @Column({ type: 'decimal', precision: 10, scale: 2, nullable: true })
+  distanceKm?: number;
 
   @ApiProperty({ description: 'Téléphone du destinataire' })
   @Column({ type: 'varchar', length: 20 })
