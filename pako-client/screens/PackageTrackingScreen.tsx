@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
-import { TrackingMap } from '../components';
 
 type PackageTrackingScreenProps = StackScreenProps<RootStackParamList, 'PackageTracking'>;
 
@@ -36,6 +36,7 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
   const [isTracking, setIsTracking] = useState(true);
   const [showCallModal, setShowCallModal] = useState(false);
   const slideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const spinValue = useRef(new Animated.Value(0)).current;
 
   // Simulation de données de suivi
   const mockTrackingData: TrackingData = {
@@ -120,36 +121,6 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
     Alert.alert("Appel", `Appel vers ${trackingData?.driver.phone}`);
   };
 
-
-  const renderTrackingMap = () => {
-    if (!trackingData) return null;
-    
-    return (
-      <TrackingMap
-        currentLocation={trackingData.currentLocation}
-        destination={trackingData.destination}
-        driver={trackingData.driver}
-        progress={trackingData.progress}
-        onCallDriver={handleCallDriver}
-      />
-    );
-  };
-
-  const renderProgressBar = () => (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressHeader}>
-        <Text style={styles.progressTitle}>Progression de la livraison</Text>
-        <Text style={styles.progressPercentage}>{trackingData?.progress}%</Text>
-      </View>
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${trackingData?.progress || 0}%` }]} />
-      </View>
-      <Text style={styles.progressText}>
-        Arrivée estimée : {trackingData?.estimatedArrival}
-      </Text>
-    </View>
-  );
-
   const renderDriverInfo = () => (
     <View style={styles.driverContainer}>
       <Text style={styles.driverTitle}>👨‍💼 Informations du livreur</Text>
@@ -179,11 +150,7 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>← Retour</Text>
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Suivi du colis</Text>
-          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>🔄 Chargement du suivi...</Text>
@@ -195,28 +162,17 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Retour</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Suivi du colis {packageId}</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Statut du colis */}
         <View style={styles.statusContainer}>
-          <Text style={styles.statusTitle}>📦 Statut actuel</Text>
+          <Text style={styles.statusTitle}>Statut actuel</Text>
           <View style={[styles.statusBadge, { backgroundColor: COLORS.primary }]}>
             <Text style={styles.statusText}>{trackingData.status}</Text>
           </View>
-          <Text style={styles.lastUpdate}>Dernière mise à jour : {trackingData.lastUpdate}</Text>
         </View>
-
-        {/* Carte de suivi intégrée */}
-        {renderTrackingMap()}
-
-        {/* Barre de progression */}
-        {renderProgressBar()}
 
         {/* Informations de livraison */}
         <View style={styles.deliveryInfo}>
@@ -309,22 +265,14 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: '500',
+    justifyContent: 'center',
   },
   headerTitle: {
     color: COLORS.primary,
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  headerSpacer: {
-    width: 60,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
@@ -334,10 +282,12 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 16,
   },
   loadingText: {
     fontSize: 18,
     color: COLORS.textSecondary,
+    marginTop: 8,
   },
   statusContainer: {
     paddingVertical: 20,
@@ -359,10 +309,6 @@ const styles = StyleSheet.create({
     color: COLORS.white,
     fontSize: 16,
     fontWeight: 'bold',
-  },
-  lastUpdate: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
   },
   mapContainer: {
     backgroundColor: COLORS.white,
@@ -391,54 +337,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
-  },
-  progressContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  progressPercentage: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
   },
   driverContainer: {
     backgroundColor: COLORS.white,

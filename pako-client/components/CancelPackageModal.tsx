@@ -91,12 +91,7 @@ const CancelPackageModal: React.FC<CancelPackageModalProps> = ({
           </View>
 
           {/* Message conditionnel */}
-          {canCancel ? (
-            <Text style={styles.message}>
-              Êtes-vous sûr de vouloir annuler la livraison de ce colis ? 
-              Cette action est irréversible.
-            </Text>
-          ) : (
+          {!canCancel ? (
             <View style={styles.cannotCancelContainer}>
               <Text style={styles.cannotCancelTitle}>⚠️ Annulation impossible</Text>
               <Text style={styles.cannotCancelMessage}>
@@ -104,7 +99,7 @@ const CancelPackageModal: React.FC<CancelPackageModalProps> = ({
                 et a été enregistré par l'agent.
               </Text>
             </View>
-          )}
+          ) : null}
 
           {/* Boutons d'action */}
           <View style={styles.buttonContainer}>

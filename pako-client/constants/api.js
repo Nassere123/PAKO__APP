@@ -2,20 +2,31 @@
 const getBaseURL = () => {
   // Détection automatique de l'environnement
   if (__DEV__) {
-    // Pour Expo Go, utiliser l'IP locale de votre machine
-    // IP Wi-Fi actuelle: 192.168.1.5
-    // Alternatives pour différents environnements:
-    // - 'http://10.0.2.2:3000' pour émulateur Android natif
-    // - 'http://localhost:3000' pour iOS Simulator
-    // - 'http://192.168.1.5:3000' pour Expo Go sur le même réseau Wi-Fi
-    return 'http://192.168.1.5:3000'; // IP Wi-Fi actuelle
+    // 🔧 CONFIGURATION POUR RÉSOUDRE NETWORK ERROR
+    // React Native/Expo ne peut pas toujours accéder à localhost
+    // Solutions par ordre de priorité:
+    
+    // Option 1: IP locale (recommandé pour Expo Go)
+    const localIP = '192.168.1.28'; // IP de la carte réseau sans fil
+    
+    // Option 2: localhost (iOS Simulator uniquement)  
+    // const apiURL = 'http://localhost:3000';
+    
+    // Option 3: Android Emulator
+    // const apiURL = 'http://10.0.2.2:3000';  
+    
+    const apiURL = `http://${localIP}:3000`;
+    console.log('🔗 Configuration API DEV:', apiURL);
+    console.log('🔧 Si erreur réseau, vérifiez votre IP locale avec ipconfig');
+    
+    return apiURL;
   }
   return 'https://api.pako.com'; // Production
 };
 
 export const API_CONFIG = {
   BASE_URL: getBaseURL(),
-  TIMEOUT: 10000,
+  TIMEOUT: 30000, // Augmenté à 30 secondes pour éviter les timeouts prématurés
   ENDPOINTS: {
     AUTH: {
       SEND_OTP: '/auth/send-otp',

@@ -31,13 +31,30 @@ export class UserStorageService {
     try {
       const userString = await AsyncStorage.getItem(USER_KEY);
       if (userString) {
-        return JSON.parse(userString);
+        const user = JSON.parse(userString);
+        
+        // Vérifier si l'ID est un UUID valide
+        if (user.id && !this.isValidUUID(user.id)) {
+          console.log('⚠️ ID utilisateur invalide détecté (timestamp):', user.id);
+          console.log('🧹 Nettoyage des données obsolètes...');
+          // Nettoyer les données obsolètes avec ID timestamp
+          await this.logout();
+          return null;
+        }
+        
+        return user;
       }
       return null;
     } catch (error) {
       console.error('Erreur lors de la récupération de l\'utilisateur:', error);
       return null;
     }
+  }
+
+  // Valider si une chaîne est un UUID valide
+  private static isValidUUID(uuid: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(uuid);
   }
 
   // Vérifier si l'utilisateur est connecté
@@ -76,15 +93,30 @@ export class UserStorageService {
     }
   }
 
-  // Créer un utilisateur après inscription
+  // Créer un utilisateur UNIQUEMENT avec l'UUID de la base de données PostgreSQL
   static async createUser(userData: {
+    id: string; // UUID PostgreSQL OBLIGATOIRE du backend
     firstName: string;
     lastName: string;
     phone: string;
     email?: string;
   }): Promise<User> {
+    // VALIDATION STRICTE : L'ID DOIT être un UUID PostgreSQL valide
+    if (!userData.id) {
+      throw new Error('❌ ERREUR CRITIQUE: ID utilisateur manquant - doit venir de PostgreSQL');
+    }
+
+    // Vérifier que c'est un UUID valide (format PostgreSQL)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(userData.id)) {
+      throw new Error(`❌ ERREUR CRITIQUE: ID invalide "${userData.id}" - doit être un UUID PostgreSQL`);
+    }
+
+    console.log('🔑 Création utilisateur avec UUID PostgreSQL valide:', userData.id);
+    console.log('👤 Utilisateur:', userData.firstName, userData.lastName);
+
     const newUser: User = {
-      id: Date.now().toString(), // ID simple basé sur le timestamp
+      id: userData.id, // UUID PostgreSQL UNIQUEMENT
       firstName: userData.firstName,
       lastName: userData.lastName,
       phone: userData.phone,
@@ -95,6 +127,7 @@ export class UserStorageService {
     };
 
     await this.saveUser(newUser);
+    console.log('✅ Utilisateur sauvegardé avec UUID PostgreSQL:', userData.id);
     return newUser;
   }
 
@@ -127,5 +160,37 @@ export class UserStorageService {
       enCours: 0,
       validees: 0,
     };
+  }
+
+  // Nettoyer toutes les données utilisateur obsolètes (avec ID timestamp)
+  static async cleanObsoleteData(): Promise<void> {
+    try {
+      console.log('🧹 Nettoyage forcé des données obsolètes...');
+      
+      // Supprimer toutes les données utilisateur
+      await AsyncStorage.removeItem(USER_KEY);
+      await AsyncStorage.removeItem(IS_CONNECTED_KEY);
+      await AsyncStorage.removeItem('authToken');
+      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('@pako_user');
+      await AsyncStorage.removeItem('@pako_is_connected');
+      
+      console.log('✅ Données obsolètes supprimées');
+    } catch (error) {
+      console.error('❌ Erreur lors du nettoyage:', error);
+      throw error;
+    }
+  }
+
+  // Fonction utilitaire pour forcer une reconnexion propre
+  static async forceCleanReconnection(): Promise<boolean> {
+    try {
+      await this.cleanObsoleteData();
+      console.log('🔄 Reconnexion propre requise - données nettoyées');
+      return true;
+    } catch (error) {
+      console.error('❌ Erreur lors du nettoyage pour reconnexion:', error);
+      return false;
+    }
   }
 }

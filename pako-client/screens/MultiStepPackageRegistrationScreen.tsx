@@ -26,7 +26,7 @@ import OSMSearchMap from '../components/OSMSearchMap';
 import { PricingCalculator, PricingResult } from '../utils/pricingCalculator';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { OrderService } from '../services/orderService';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useTranslation } from '../hooks';
 
 type MultiStepPackageRegistrationScreenProps = StackScreenProps<RootStackParamList, 'MultiStepPackageRegistration'>;
 
@@ -62,6 +62,7 @@ interface OrderData {
 
 const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
+  const { t } = useTranslation();
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
@@ -527,11 +528,11 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       if (status === 'granted') {
         fetchAndShowContacts();
       } else {
-        Alert.alert('Permission refusée', 'Vous devez autoriser l\'accès aux contacts pour utiliser cette fonctionnalité');
+        Alert.alert(t('permission_refusee'), t('autoriser_acces_contacts'));
       }
     } catch (error) {
       console.error('Erreur demande permission:', error);
-      Alert.alert('Erreur', 'Impossible de demander la permission d\'accès aux contacts');
+      Alert.alert(t('erreur'), t('erreur_demande_permission'));
     }
   };
 
@@ -957,20 +958,8 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       console.log('Nombre de colis:', createdOrder.packages?.length || 0);
       console.log('Détails complets:', createdOrder);
 
-      // Sauvegarder aussi localement pour compatibilité
-      const existingOrders = await AsyncStorage.getItem('@pako_simple_orders');
-      const orders = existingOrders ? JSON.parse(existingOrders) : [];
-      
-      const localOrder = {
-        id: createdOrder.id,
-        orderNumber: createdOrder.orderNumber,
-        ...orderDataForBackend,
-        status: 'confirmed',
-        createdAt: new Date().toISOString(),
-      };
-      
-      orders.push(localOrder);
-      await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(orders));
+      console.log('✅ Commande créée avec succès dans la base de données');
+      console.log('📦 La commande sera récupérée automatiquement via l\'API lors du prochain chargement de "Mes colis"');
 
       setLoading(false);
 
@@ -1611,7 +1600,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
 
       {/* Section Destinataire */}
       <View style={styles.sectionContainer}>
-        <Text style={styles.sectionTitle}>Informations destinataire</Text>
+        <Text style={styles.sectionTitle}>Informations expéditeur</Text>
         
         <TextInput
           style={styles.input}
@@ -1621,7 +1610,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         />
         
         <PhoneInput
-          placeholder="Téléphone du destinataire *"
+          placeholder="Téléphone de l'expéditeur *"
           value={orderData.receiverPhone}
           onChangeText={(value) => handleOrderInputChange('receiverPhone', value)}
           style={styles.phoneInput}
@@ -1793,26 +1782,26 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
 
   const renderStep3 = () => (
     <View style={styles.stepContainer}>
-      <Text style={styles.stepTitle}>Étape 3/3 - Récapitulatif</Text>
+      <Text style={styles.stepTitle}>{t('etape_3_recap')}</Text>
 
       <View style={styles.card}>
-        <Text style={styles.cardTitle}>Informations générales</Text>
+        <Text style={styles.cardTitle}>{t('info_generales')}</Text>
 
         <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Expéditeur</Text>
+          <Text style={styles.kvLabel}>{t('expediteur')}</Text>
           <Text style={styles.kvValue}>{orderData.senderName || '-'}</Text>
         </View>
         <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Téléphone expéditeur</Text>
+          <Text style={styles.kvLabel}>{t('qui_expedie_colis')}</Text>
           <Text style={styles.kvValue}>{orderData.senderPhone || '-'}</Text>
         </View>
         <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Ville</Text>
+          <Text style={styles.kvLabel}>{t('ville')}</Text>
           <Text style={styles.kvValue}>{coteIvoireCities.find(city => city.value === orderData.senderCity)?.label || '-'}</Text>
         </View>
         {!!orderData.senderDistrict && (
           <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Quartier</Text>
+            <Text style={styles.kvLabel}>{t('quartier')}</Text>
             <Text style={styles.kvValue}>{orderData.senderDistrict}</Text>
           </View>
         )}
@@ -1826,13 +1815,13 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
         </View>
         <View style={styles.kvDivider} />
         <View style={styles.kvRow}>
-          <Text style={styles.kvLabel}>Adresse de livraison</Text>
+          <Text style={styles.kvLabel}>{t('adresse_livraison')}</Text>
           <Text style={styles.kvValue}>{orderData.deliveryAddress || '-'}</Text>
         </View>
         {orderData.distanceKm && (
           <View style={styles.kvRow}>
-            <Text style={styles.kvLabel}>Distance gare → livraison</Text>
-            <Text style={[styles.kvValue, styles.distanceValue]}>{orderData.distanceKm} km</Text>
+            <Text style={styles.kvLabel}>{t('distance_gare_livraison')}</Text>
+            <Text style={[styles.kvValue, styles.distanceValue]}>{orderData.distanceKm} {t('km')}</Text>
           </View>
         )}
       </View>
@@ -1881,38 +1870,38 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
       {/* Section de prix simplifiée */}
       {pricingInfo && (
         <View style={styles.card}>
-          <Text style={styles.cardTitle}>💰 Prix de livraison</Text>
+          <Text style={styles.cardTitle}>{t('prix_livraison')}</Text>
           
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Type de livraison</Text>
+            <Text style={styles.pricingLabel}>{t('type_livraison')}</Text>
             <View style={styles.pricingValueWithIcon}>
               {orderData.deliveryType === 'express' ? (
                 <>
                   <MaterialCommunityIcons name="lightning-bolt" size={16} color="#FFD700" />
-                  <Text style={styles.pricingValue}>Express (- de 24h)</Text>
+                  <Text style={styles.pricingValue}>{t('express_24h')}</Text>
                 </>
               ) : (
                 <>
                   <MaterialCommunityIcons name="truck-delivery" size={16} color={COLORS.primary} />
-                  <Text style={styles.pricingValue}>Standard (72h)</Text>
+                  <Text style={styles.pricingValue}>{t('standard_72h')}</Text>
                 </>
               )}
             </View>
           </View>
           
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Distance</Text>
-            <Text style={styles.pricingValue}>{pricingInfo.distanceKm} km</Text>
+            <Text style={styles.pricingLabel}>{t('distance')}</Text>
+            <Text style={styles.pricingValue}>{pricingInfo.distanceKm} {t('km')}</Text>
           </View>
           
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingLabel}>Prix de base</Text>
+            <Text style={styles.pricingLabel}>{t('prix_base')}</Text>
             <Text style={styles.pricingValue}>{PricingCalculator.formatPrice(pricingInfo.basePrice)}</Text>
           </View>
 
           {pricingInfo.expressCharge > 0 && (
             <View style={styles.pricingRow}>
-              <Text style={styles.pricingLabel}>Supplément Express</Text>
+              <Text style={styles.pricingLabel}>{t('supplement_express')}</Text>
               <Text style={styles.pricingValue}>+{PricingCalculator.formatPrice(pricingInfo.expressCharge)}</Text>
             </View>
           )}
@@ -1920,7 +1909,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           <View style={styles.pricingDivider} />
           
           <View style={styles.pricingRow}>
-            <Text style={styles.pricingTotalLabel}>Total à payer</Text>
+            <Text style={styles.pricingTotalLabel}>{t('total_payer')}</Text>
             <Text style={styles.pricingTotalValue}>{PricingCalculator.formatPrice(pricingInfo.totalPrice)}</Text>
           </View>
           
@@ -1944,7 +1933,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
           <View style={styles.modernButtonContainer}>
             <TouchableOpacity style={styles.modernPreviousButton} onPress={handlePrevious}>
               <MaterialCommunityIcons name="chevron-left" size={18} color={COLORS.textSecondary} />
-              <Text style={styles.modernPreviousButtonText}>Précédent</Text>
+              <Text style={styles.modernPreviousButtonText}>{t('precedent')}</Text>
             </TouchableOpacity>
             
             {currentStep < totalSteps ? (
@@ -1959,7 +1948,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                 <Text style={[
                   styles.modernNextButtonText,
                   !isStepValid() && styles.modernDisabledButtonText
-                ]}>Suivant</Text>
+                ]}>{t('suivant')}</Text>
                 <MaterialCommunityIcons 
                   name="chevron-right" 
                   size={18} 
@@ -1980,7 +1969,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                 ) : (
                   <>
                     <MaterialCommunityIcons name="check-circle" size={18} color={COLORS.white} />
-                    <Text style={styles.modernNextButtonText}>Valider la commande</Text>
+                    <Text style={styles.modernNextButtonText}>{t('valider_commande')}</Text>
                   </>
                 )}
               </TouchableOpacity>
@@ -2030,9 +2019,14 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             ]}
           >
             <View style={styles.popupContent}>
+              {/* Logo PAKO */}
+              <View style={styles.pakoLogoContainer}>
+                <Text style={styles.pakoLogoText}>PAKO</Text>
+              </View>
+              
               <View style={styles.popupHeader}>
                 <Text style={styles.popupTitle}>Informations de localisation</Text>
-                <Text style={styles.popupSubtitle}>Remplissez les informations de localisation</Text>
+                <Text style={styles.popupSubtitle}>{t('remplissez_info_localisation')}</Text>
               </View>
 
               <ScrollView style={styles.popupScrollView} showsVerticalScrollIndicator={false}>
@@ -2097,13 +2091,13 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                   style={styles.popupCancelButton} 
                   onPress={hideLocationModalPopup}
                 >
-                  <Text style={styles.popupCancelButtonText}>Annuler</Text>
+                  <Text style={styles.popupCancelButtonText}>{t('cancel')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity 
                   style={styles.popupNextButton} 
                   onPress={handleLocationModalNext}
                 >
-                  <Text style={styles.popupNextButtonText}>Suivant</Text>
+                  <Text style={styles.popupNextButtonText}>{t('suivant')}</Text>
                   <MaterialCommunityIcons name="chevron-right" size={18} color="white" />
                 </TouchableOpacity>
               </View>
@@ -2127,9 +2121,14 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             ]}
           >
             <View style={styles.popupContent}>
+              {/* Logo PAKO */}
+              <View style={styles.pakoLogoContainer}>
+                <Text style={styles.pakoLogoText}>PAKO</Text>
+              </View>
+              
               <View style={styles.popupHeader}>
                 <Text style={styles.popupTitle}>Détails de la commande</Text>
-                <Text style={styles.popupSubtitle}>Complétez les informations de la commande</Text>
+                <Text style={styles.popupSubtitle}>{t('completez_info_commande')}</Text>
               </View>
 
               <ScrollView style={styles.popupScrollView} showsVerticalScrollIndicator={false}>
@@ -2186,14 +2185,14 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.addAnotherPackageButtonText,
                       !orderData.packageCode && styles.addAnotherPackageButtonTextDisabled
                     ]}>
-                      Ajouter un autre colis ({packageCount + 1})
+                      {t('ajouter_autre_colis')} ({packageCount + 1})
                     </Text>
                   </TouchableOpacity>
                 </View>
 
                 {/* Section Téléphone expéditeur */}
                 <View style={styles.popupSection}>
-                  <Text style={styles.popupSectionTitle}>Téléphone expéditeur</Text>
+                  <Text style={styles.popupSectionTitle}>Qui expédie le colis?</Text>
                   <TouchableOpacity 
                     style={styles.senderPhoneSelector}
                     onPress={() => {
@@ -2484,6 +2483,11 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             {/* Handle du drawer */}
             <View style={styles.drawerHandle} />
             
+            {/* Logo PAKO */}
+            <View style={styles.pakoLogoContainer}>
+              <Text style={styles.pakoLogoText}>PAKO</Text>
+            </View>
+            
             {/* Étape 0: Nom expéditeur */}
             {currentPopupStep === 0 && (
               <>
@@ -2537,7 +2541,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={hidePopupModal}
                   >
-                    <Text style={styles.popupBackButtonText}>Annuler</Text>
+                    <Text style={styles.popupBackButtonText}>{t('cancel')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2551,7 +2555,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(0) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2584,7 +2588,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={showPreviousPopup}
                   >
-                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                    <Text style={styles.popupBackButtonText}>{t('precedent')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2598,7 +2602,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(1) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2683,7 +2687,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={showPreviousPopup}
                   >
-                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                    <Text style={styles.popupBackButtonText}>{t('precedent')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2697,7 +2701,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(2) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2722,7 +2726,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     ]}>
                       {orderData.senderCity 
                         ? coteIvoireCities.find(city => city.value === orderData.senderCity)?.label 
-                        : 'Ville d\'origine du colis'
+                        : t('ville_origine_colis')
                       }
                     </Text>
                     <Text style={styles.popupSelectorIcon}>
@@ -2761,7 +2765,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={showPreviousPopup}
                   >
-                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                    <Text style={styles.popupBackButtonText}>{t('precedent')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2775,7 +2779,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(3) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2822,7 +2826,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.addAnotherPackageButtonText,
                       !orderData.packageCode && styles.addAnotherPackageButtonTextDisabled
                     ]}>
-                      Ajouter un autre colis ({packageCount + 1})
+                      {t('ajouter_autre_colis')} ({packageCount + 1})
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2831,7 +2835,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={showPreviousPopup}
                   >
-                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                    <Text style={styles.popupBackButtonText}>{t('precedent')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2845,7 +2849,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(4) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2856,7 +2860,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             {currentPopupStep === 5 && (
               <>
                 <View style={styles.popupHeader}>
-                  <Text style={styles.popupTitle}>Sélectionner le numéro de l'expéditeur</Text>
+                  <Text style={styles.popupTitle}>Qui expédie le colis?</Text>
                   <Text style={styles.popupStep}>6/6</Text>
                 </View>
                 <View style={styles.popupContent}>
@@ -2880,7 +2884,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                     style={styles.popupBackButton}
                     onPress={showPreviousPopup}
                   >
-                    <Text style={styles.popupBackButtonText}>Précédent</Text>
+                    <Text style={styles.popupBackButtonText}>{t('precedent')}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity 
                     style={[
@@ -2894,7 +2898,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       !validatePopupStep(5) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -2929,12 +2933,16 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             {/* Handle du drawer */}
             <View style={styles.drawerHandle} />
             
+            {/* Logo PAKO */}
+            <View style={styles.pakoLogoContainer}>
+              <Text style={styles.pakoLogoText}>PAKO</Text>
+            </View>
+            
             {/* Étape 0: Type de livraison */}
             {currentPackageStep === 0 && (
               <>
                 <View style={styles.popupHeader}>
-                  <Text style={styles.popupTitle}>Type de livraison</Text>
-                  <Text style={styles.popupStep}>1/1</Text>
+                  <Text style={styles.popupTitle}>{t('type_livraison')}</Text>
                 </View>
                 <View style={styles.popupContent}>
                   <Text style={styles.deliveryTypeLabel}>Choisissez le type de livraison :</Text>
@@ -2953,9 +2961,9 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       <View style={styles.deliveryTypeHeader}>
                         <View style={styles.deliveryTypeNameContainer}>
                           <MaterialCommunityIcons name="truck-delivery" size={20} color={COLORS.primary} />
-                          <Text style={styles.deliveryTypeName}>Standard</Text>
+                          <Text style={styles.deliveryTypeName}>{t('standard')}</Text>
                         </View>
-                        <Text style={styles.deliveryTypePrice}>Prix normal</Text>
+                        <Text style={styles.deliveryTypePrice}>{t('prix_normal')}</Text>
                       </View>
                       <Text style={styles.deliveryTypeDescription}>Livraison en 72h</Text>
                     </View>
@@ -2980,7 +2988,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       <View style={styles.deliveryTypeHeader}>
                         <View style={styles.deliveryTypeNameContainer}>
                           <MaterialCommunityIcons name="lightning-bolt" size={20} color="#FFD700" />
-                          <Text style={styles.deliveryTypeName}>Express</Text>
+                          <Text style={styles.deliveryTypeName}>{t('express')}</Text>
                         </View>
                         <Text style={styles.deliveryTypePriceExtra}>+2000 FCFA</Text>
                       </View>
@@ -3045,7 +3053,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                       styles.popupNextButtonText,
                       (!orderData.deliveryType || !orderData.paymentMethod) && styles.popupNextButtonTextDisabled
                     ]}>
-                      Suivant
+                      {t('suivant')}
                     </Text>
                   </TouchableOpacity>
                 </View>
@@ -3076,8 +3084,13 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             {/* Handle du drawer */}
             <View style={styles.drawerHandle} />
             
+            {/* Logo PAKO */}
+            <View style={styles.pakoLogoContainer}>
+              <Text style={styles.pakoLogoText}>PAKO</Text>
+            </View>
+            
             <View style={styles.popupHeader}>
-              <Text style={styles.popupTitle}>🎉 Colis enregistré !</Text>
+              <Text style={styles.popupTitle}>{t('commande_creee_success')}</Text>
             </View>
             
             <View style={styles.popupContent}>
@@ -3091,7 +3104,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                   style={styles.packageChoiceButton}
                   onPress={handleValidateOrder}
                 >
-                  <Text style={styles.packageChoiceButtonText}>🎉 Valider la commande</Text>
+                  <Text style={styles.packageChoiceButtonText}>🎉 {t('valider_commande')}</Text>
                 </TouchableOpacity>
                 
                 <TouchableOpacity 
@@ -3099,7 +3112,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
                   onPress={handleAddAnotherPackage}
                 >
                   <Text style={[styles.packageChoiceButtonText, styles.packageChoiceButtonTextSecondary]}>
-                    📦 Ajouter un autre colis ({packageCount + 1})
+                    📦 {t('ajouter_autre_colis')} ({packageCount + 1})
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -3227,7 +3240,7 @@ const MultiStepPackageRegistrationScreen: React.FC<MultiStepPackageRegistrationS
             {/* Header */}
             <View style={styles.contactModalHeader}>
               <Text style={styles.contactModalTitle}>
-                Destinataire
+                Expéditeur
               </Text>
               <TouchableOpacity 
                 style={styles.contactModalCloseButton}
@@ -4132,8 +4145,19 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: '#E0E0E0',
     borderRadius: 2,
-    marginBottom: 20,
+    marginBottom: 10,
     marginTop: 8,
+    alignSelf: 'center',
+  },
+  pakoLogoContainer: {
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  pakoLogoText: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: COLORS.primary,
+    letterSpacing: 2,
   },
   popupHeader: {
     alignItems: 'center',

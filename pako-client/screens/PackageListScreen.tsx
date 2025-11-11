@@ -7,11 +7,17 @@ import { COLORS } from '../constants';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CancelPackageModal from '../components/CancelPackageModal';
 import Toast from '../components/Toast';
+import { useAuth, useTheme, useTranslation } from '../hooks';
+import { UserOrderService } from '../services/userOrderService';
+import { CancelOrderService } from '../services/cancelOrderService';
 
 type PackageListScreenProps = StackScreenProps<RootStackParamList, 'PackageList'>;
 
 const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route }) => {
   const { category } = route.params as { category: 'received' | 'in_transit' | 'cancelled' };
+  const { user } = useAuth();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [cancelModalVisible, setCancelModalVisible] = useState(false);
@@ -22,22 +28,35 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
 
   useEffect(() => {
     loadOrders();
-  }, [category]);
+  }, [category, user?.id]); // Recharger quand l'utilisateur change
 
   const loadOrders = async () => {
     try {
       setLoading(true);
       
-      // Charger depuis la clé simple
-      const simpleOrders = await AsyncStorage.getItem('@pako_simple_orders');
+      if (!user?.id) {
+        console.log('⚠️ Pas d\'utilisateur - affichage vide');
+        setOrders([]);
+        return;
+      }
+      
+      // Synchroniser les commandes depuis l'API si possible
+      try {
+        console.log('🔄 Synchronisation des commandes depuis l\'API...');
+        await UserOrderService.syncOrdersToLocal(user.id);
+      } catch (error) {
+        console.log('⚠️ Erreur sync API - utilisation des données locales:', error);
+      }
+      
+      // Charger les commandes depuis le stockage avec une clé spécifique par utilisateur
+      const userOrdersKey = user?.id ? `@pako_orders_${user.id}` : '@pako_simple_orders';
+      console.log('🔑 Clé de stockage utilisée:', userOrdersKey);
+      console.log('👤 Utilisateur actuel:', user ? `${user.firstName} ${user.lastName}` : 'Aucun');
+      const simpleOrders = await AsyncStorage.getItem(userOrdersKey);
       const allOrders = simpleOrders ? JSON.parse(simpleOrders) : [];
+      console.log('📦 Nombre de commandes chargées:', allOrders.length);
       
-      console.log('=== DEBUG PackageListScreen ===');
-      console.log('Category:', category);
-      console.log('Raw data from storage:', simpleOrders);
-      console.log('Parsed orders:', allOrders);
-      console.log('Number of orders:', allOrders.length);
-      
+      // Filtrer les commandes par catégorie
       let filteredOrders: any[] = [];
       
       switch (category) {
@@ -48,8 +67,6 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
           filteredOrders = allOrders.filter((order: any) => 
             order.status === 'confirmed' || order.status === 'in_transit' || order.status === 'pending'
           );
-          console.log('Filtered in_transit orders:', filteredOrders);
-          console.log('Order statuses:', allOrders.map((o: any) => o.status));
           break;
         case 'cancelled':
           filteredOrders = allOrders.filter((order: any) => order.status === 'cancelled');
@@ -78,31 +95,75 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
     if (!selectedOrder) return;
 
     try {
-      // Récupérer toutes les commandes
-      const simpleOrders = await AsyncStorage.getItem('@pako_simple_orders');
+      console.log('🚫 === DÉBUT ANNULATION COMMANDE ===');
+      console.log('📦 Commande sélectionnée:', selectedOrder);
+      console.log('🆔 Order ID:', selectedOrder.id);
+      
+      // ÉTAPE 1: Mettre à jour le statut dans la base de données backend
+      if (selectedOrder.id) {
+        try {
+          console.log('📡 Appel API pour annuler la commande dans la BD...');
+          const updatedOrder = await CancelOrderService.cancelOrder(selectedOrder.id);
+          console.log('✅ Commande annulée dans la base de données:', updatedOrder);
+        } catch (apiError) {
+          console.error('❌ Erreur API annulation:', apiError);
+          // Continuer quand même pour mettre à jour le local
+          console.log('⚠️ Poursuite avec mise à jour locale seulement...');
+        }
+      } else {
+        console.log('⚠️ Pas d\'ID de commande - mise à jour locale seulement');
+      }
+      
+      // ÉTAPE 2: Mettre à jour le stockage local
+      console.log('💾 Mise à jour du stockage local...');
+      const userOrdersKey = user?.id ? `@pako_orders_${user.id}` : '@pako_simple_orders';
+      const simpleOrders = await AsyncStorage.getItem(userOrdersKey);
       const allOrders = simpleOrders ? JSON.parse(simpleOrders) : [];
       
       // Mettre à jour le statut de la commande sélectionnée
       const updatedOrders = allOrders.map((order: any) => 
-        order.id === selectedOrder.id 
+        order.id === selectedOrder.id || order.orderNumber === selectedOrder.orderNumber
           ? { ...order, status: 'cancelled', cancelledAt: new Date().toISOString() }
           : order
       );
       
-      // Sauvegarder les commandes mises à jour
-      await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(updatedOrders));
+      // Sauvegarder les commandes mises à jour avec la clé utilisateur
+      await AsyncStorage.setItem(userOrdersKey, JSON.stringify(updatedOrders));
+      console.log('✅ Stockage local mis à jour');
       
-      // Fermer le modal et recharger les données
+      // ÉTAPE 3: Synchroniser depuis l'API pour avoir les données à jour
+      if (user?.id) {
+        try {
+          console.log('🔄 Synchronisation des commandes depuis l\'API...');
+          await UserOrderService.syncOrdersToLocal(user.id);
+          console.log('✅ Synchronisation terminée');
+        } catch (syncError) {
+          console.log('⚠️ Erreur synchronisation - données locales utilisées:', syncError);
+        }
+      }
+      
+      // Fermer le modal
       setCancelModalVisible(false);
       setSelectedOrder(null);
-      loadOrders();
+      
+      // Recharger les données
+      await loadOrders();
+      
+      // Naviguer vers les colis annulés si on était sur colis en cours
+      if (category === 'in_transit') {
+        console.log('🔄 Navigation vers colis annulés...');
+        // Le colis devrait maintenant apparaître dans "Colis annulés"
+      }
       
       // Afficher le toast de succès
-      showToast('Votre colis a été annulé avec succès !', 'success');
+      showToast(t('colis_annule_success'), 'success');
+      
+      console.log('✅ ANNULATION TERMINÉE\n');
+      
     } catch (error) {
-      console.error('Erreur lors de l\'annulation:', error);
+      console.error('❌ Erreur lors de l\'annulation:', error);
       // Afficher le toast d'erreur
-      showToast('Une erreur est survenue lors de l\'annulation. Veuillez réessayer.', 'error');
+      showToast(t('erreur_annulation'), 'error');
     }
   };
 
@@ -126,22 +187,22 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
     switch (category) {
       case 'received':
         return {
-          title: 'Colis reçus',
-          subtitle: 'Colis livrés avec succès',
+          title: t('received_packages'),
+          subtitle: t('delivered_successfully'),
           color: '#4CAF50',
           icon: true
         };
       case 'in_transit':
         return {
-          title: 'Colis en cours de livraison',
-          subtitle: 'Colis actuellement en transit',
-          color: '#FF9800',
+          title: t('in_transit_packages'),
+          subtitle: t('in_transit_desc'),
+          color: '#FF9800', // Orange pour les colis en cours
           icon: true
         };
       case 'cancelled':
         return {
-          title: 'Colis annulés',
-          subtitle: 'Colis annulés ou retournés',
+          title: t('cancelled_packages'),
+          subtitle: t('cancelled_desc'),
           color: '#F44336',
           icon: false
         };
@@ -159,32 +220,75 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
 
   const renderOrderItem = ({ order }: { order: any }) => (
     <TouchableOpacity
-      key={order.id}
-      style={styles.packageCard}
-      onPress={() => navigation.navigate('PackageTracking', { packageId: order.orderNumber })}
+      style={[styles.packageCard, { backgroundColor: colors.white, shadowColor: colors.shadow }]}
+      onPress={() => {
+        // Les colis annulés ne sont pas cliquables (pas de navigation)
+        if (category === 'cancelled') {
+          return; // Ne rien faire si c'est un colis annulé
+        }
+        // Navigation uniquement pour les colis en cours ou reçus
+        navigation.navigate('PackageTracking', { packageId: order.orderNumber });
+      }}
+      disabled={category === 'cancelled'}
+      activeOpacity={category === 'cancelled' ? 1 : 0.7}
     >
       <View style={styles.packageHeader}>
-        <Text style={styles.packageCode}>{order.packageCode || order.orderNumber}</Text>
+        <View style={styles.packageCodeContainer}>
+          <Text style={[styles.packageCode, { color: colors.textPrimary }]}>
+            {order.packages && order.packages.length > 1 ? (
+              // Afficher tous les codes des colis séparés par des virgules
+              order.packages
+                .map((pkg: any) => pkg.packageCode || order.packageCode || order.orderNumber)
+                .join(', ')
+            ) : (
+              // Afficher un seul code s'il n'y a qu'un colis
+              order.packages?.[0]?.packageCode || order.packageCode || order.orderNumber
+            )}
+          </Text>
+        </View>
         <View style={[styles.statusBadge, { backgroundColor: categoryInfo.color }]}>
-          <Text style={styles.statusText}>En cours</Text>
+          <Text style={styles.statusText}>
+            {category === 'cancelled' ? 'Annulé' : category === 'received' ? 'Livré' : 'En cours'}
+          </Text>
         </View>
       </View>
       
-      {/* Utiliser les données du récapitulatif */}
-      <Text style={styles.packageDescription}>
+      <Text style={[styles.packageDescription, { color: colors.textPrimary }]}>
         {order.packages?.length > 0 ? `${order.packages.length} colis` : '1 colis'}
         {order.deliveryType === 'express' ? ' • Express' : ' • Standard'}
       </Text>
-      <Text style={styles.packageType}>📍 {order.deliveryAddress}</Text>
+      
+      <View style={styles.iconTextRow}>
+        <Ionicons name="location-outline" size={16} color="#F44336" style={styles.infoIcon} />
+        <Text style={[styles.packageType, { color: colors.textSecondary }]}>{order.deliveryAddress}</Text>
+      </View>
       
       <View style={styles.packageFooter}>
-        <Text style={styles.packageDate}>📅 {new Date(order.createdAt).toLocaleDateString('fr-FR')}</Text>
+        <View style={[styles.iconTextRow, { flex: 1 }]}>
+          <Ionicons name="calendar-outline" size={16} color="#2196F3" style={styles.infoIcon} />
+          <Text style={[styles.packageDate, { color: colors.textSecondary }]}>
+            {new Date(order.createdAt).toLocaleDateString('fr-FR', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            })} à {new Date(order.createdAt).toLocaleTimeString('fr-FR', {
+              hour: '2-digit',
+              minute: '2-digit'
+            })}
+          </Text>
+        </View>
         {order.totalPrice && order.totalPrice > 0 && (
-          <Text style={styles.packageValue}>💰 {order.totalPrice.toLocaleString()} FCFA</Text>
+          <View style={styles.iconTextRow}>
+            <Ionicons name="cash-outline" size={16} color="#FFC107" style={styles.infoIcon} />
+            <Text style={[styles.packageValue, { color: colors.textSecondary }]}>{order.totalPrice.toLocaleString()} FCFA</Text>
+          </View>
         )}
       </View>
       
-      <Text style={styles.trackingNumber}>🔍 Suivi: {order.packageCode || order.orderNumber}</Text>
+      <View style={styles.iconTextRow}>
+        <Ionicons name="search-outline" size={16} color="#FF9800" style={styles.infoIcon} />
+        <Text style={styles.trackingNumber}>{order.orderNumber || order.packageCode}</Text>
+      </View>
       
       {category === 'in_transit' && (
         <View style={styles.actionButtonsContainer}>
@@ -205,110 +309,45 @@ const PackageListScreen: React.FC<PackageListScreenProps> = ({ navigation, route
           </TouchableOpacity>
         </View>
       )}
-
     </TouchableOpacity>
   );
 
   const renderEmptyState = () => (
     <View style={styles.emptyState}>
       <Text style={styles.emptyStateIcon}>📦</Text>
-      <Text style={styles.emptyStateTitle}>Aucun colis trouvé</Text>
-      <Text style={styles.emptyStateText}>
-        Vous n'avez aucun colis dans cette catégorie pour le moment.
+      <Text style={[styles.emptyStateTitle, { color: colors.textPrimary }]}>{t('aucun_colis_trouve')}</Text>
+      <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+        {t('aucun_colis_categorie')}
       </Text>
       
-      {/* Boutons de test temporaires */}
-      <View style={styles.testButtonsContainer}>
-          <TouchableOpacity 
-          style={[styles.trackButton, { marginTop: 20, marginRight: 10 }]}
-            onPress={async () => {
-            console.log('=== TEST STOCKAGE ===');
-            const data = await AsyncStorage.getItem('@pako_simple_orders');
-            console.log('Données brutes du stockage:', data);
-            const parsed = data ? JSON.parse(data) : [];
-            console.log('Données parsées:', parsed);
-            console.log('Nombre de commandes:', parsed.length);
-            
-            if (parsed.length > 0) {
-              console.log('Première commande:', parsed[0]);
-              console.log('Statut première commande:', parsed[0].status);
-              console.log('Toutes les commandes:', parsed);
-            } else {
-              console.log('Aucune commande trouvée dans le stockage');
-            }
-            
-            // Recharger les données
-              loadOrders();
-            }}
-          >
-          <Text style={styles.trackButtonText}>🔍 Vérifier</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity 
-          style={[styles.cancelButton, { marginTop: 20 }]}
-            onPress={async () => {
-            console.log('=== CRÉATION TEST SIMPLE ===');
-            const testOrder = {
-              id: `test_${Date.now()}`,
-              orderNumber: `#PAKO-TEST-${Math.floor(Math.random() * 1000)}`,
-              packageCode: 'PK002',
-              deliveryAddress: 'Cocody, Angré 8ème Tranche, Abidjan',
-              senderName: 'Test User',
-              status: 'confirmed',
-              createdAt: new Date().toISOString(),
-              totalPrice: 2500,
-              deliveryType: 'standard',
-              packages: [{ packageCode: 'PK002', packageDescription: 'Colis standard' }]
-            };
-            
-            console.log('Création du colis de test:', testOrder);
-            
-            const existingOrders = await AsyncStorage.getItem('@pako_simple_orders');
-            const orders = existingOrders ? JSON.parse(existingOrders) : [];
-            orders.push(testOrder);
-            await AsyncStorage.setItem('@pako_simple_orders', JSON.stringify(orders));
-            
-            console.log('Colis de test sauvegardé. Total commandes:', orders.length);
-            console.log('Toutes les commandes après sauvegarde:', orders);
-            
-            // Recharger les données
-              loadOrders();
-            }}
-          >
-          <Text style={styles.cancelButtonText}>➕ Test</Text>
-          </TouchableOpacity>
-        </View>
     </View>
   );
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Retour</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Mes colis</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.categoryHeader}>
           <View style={styles.categoryTitleContainer}>
-            <Text style={styles.categoryTitle}>{categoryInfo.title}</Text>
+            <Text style={[styles.categoryTitle, { color: categoryInfo.color }]}>{categoryInfo.title}</Text>
           </View>
-          <Text style={styles.categorySubtitle}>{categoryInfo.subtitle}</Text>
-          <View style={[styles.categoryIndicator, { backgroundColor: categoryInfo.color }]} />
         </View>
 
         {loading ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateText}>Chargement des commandes...</Text>
+            <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>Chargement des commandes...</Text>
           </View>
         ) : orders.length === 0 ? (
           renderEmptyState()
         ) : (
           <View style={styles.packagesList}>
-            {orders.map((order) => renderOrderItem({ order }))}
+            {orders.map((order) => (
+              <View key={order.id}>
+                {renderOrderItem({ order })}
+              </View>
+            ))}
           </View>
         )}
       </ScrollView>
@@ -381,9 +420,10 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryTitle: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    color: '#000000',
+    fontSize: 26,
+    fontWeight: '700',
+    letterSpacing: 0.5,
+    lineHeight: 32,
   },
   categorySubtitle: {
     fontSize: 14,
@@ -414,10 +454,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 12,
   },
+  packageCodeContainer: {
+    flex: 1,
+    marginRight: 8,
+  },
   packageCode: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#000000',
+    flexWrap: 'wrap',
   },
   statusBadge: {
     paddingHorizontal: 12,
@@ -434,27 +479,36 @@ const styles = StyleSheet.create({
     color: COLORS.textPrimary,
     marginBottom: 8,
   },
+  iconTextRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  infoIcon: {
+    marginRight: 8,
+  },
   packageType: {
     fontSize: 14,
     color: COLORS.textSecondary,
-    marginBottom: 12,
+    flex: 1,
   },
   packageFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
     marginBottom: 8,
   },
   packageDate: {
     fontSize: 12,
     color: COLORS.textSecondary,
-    marginBottom: 4,
   },
   packageValue: {
     fontSize: 12,
     color: COLORS.textSecondary,
+    fontWeight: '600',
   },
   trackingNumber: {
     fontSize: 12,
     color: COLORS.primary,
-    marginTop: 8,
     fontStyle: 'italic',
   },
   actionButtonsContainer: {
@@ -517,11 +571,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: 20,
     lineHeight: 22,
-  },
-  testButtonsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
   },
 });
 

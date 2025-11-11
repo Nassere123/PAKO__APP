@@ -1,6 +1,6 @@
 import { API_CONFIG } from '../constants/api';
 
-export interface PackageData {
+export interface OrderPackageData {
   packageCode: string;
 }
 
@@ -18,7 +18,7 @@ export interface OrderData {
   senderPhone: string;
   deliveryType: 'standard' | 'express';
   paymentMethod: 'cash' | 'wave' | 'orange';
-  packages: PackageData[];
+  packages: OrderPackageData[];
   totalPrice?: number;
 }
 
@@ -60,7 +60,7 @@ export class OrderService {
       console.log('Données à envoyer:', JSON.stringify(orderData, null, 2));
       console.log('Customer ID (local):', customerId);
       console.log('Type d\'ID:', typeof customerId);
-      console.log('URL de l\'API:', `${API_CONFIG.BASE_URL}/orders/with-packages`);
+      console.log('URL de l\'API:', `${API_CONFIG.BASE_URL}/orders`);
       console.log('BASE_URL:', API_CONFIG.BASE_URL);
 
       // Si l'ID est numérique, récupérer l'utilisateur existant par téléphone
@@ -123,7 +123,8 @@ export class OrderService {
       console.log('🆔 ID utilisateur final utilisé:', backendCustomerId);
 
       console.log('📡 Envoi de la requête au backend...');
-      const response = await fetch(`${API_CONFIG.BASE_URL}/orders/with-packages`, {
+      console.log('🔗 URL:', `${API_CONFIG.BASE_URL}/orders`);
+      const response = await fetch(`${API_CONFIG.BASE_URL}/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
