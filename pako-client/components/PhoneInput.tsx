@@ -43,6 +43,7 @@ const PhoneInput: React.FC<PhoneInputProps> = ({
       <TextInput
         style={styles.phoneInput}
         placeholder={placeholder}
+        placeholderTextColor={COLORS.textSecondary}
         value={localNumber}
         onChangeText={handlePhoneChange}
         keyboardType="phone-pad"

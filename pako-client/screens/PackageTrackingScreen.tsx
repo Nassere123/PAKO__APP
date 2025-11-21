@@ -1,9 +1,13 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, Modal, Animated, Dimensions } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { StackScreenProps } from '@react-navigation/stack';
 import { RootStackParamList } from '../types';
 import { COLORS } from '../constants';
-import { TrackingMap } from '../components';
+import TrackingMap from '../components/TrackingMap';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useAuth } from '../hooks';
+import * as Location from 'expo-location';
 
 type PackageTrackingScreenProps = StackScreenProps<RootStackParamList, 'PackageTracking'>;
 
@@ -32,65 +36,154 @@ interface TrackingData {
 
 const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigation, route }) => {
   const { packageId } = route.params;
+  const { user } = useAuth();
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [isTracking, setIsTracking] = useState(true);
   const [showCallModal, setShowCallModal] = useState(false);
+  const [loading, setLoading] = useState(true);
   const slideAnim = useState(new Animated.Value(Dimensions.get('window').height))[0];
+  const spinValue = useRef(new Animated.Value(0)).current;
 
-  // Simulation de données de suivi
-  const mockTrackingData: TrackingData = {
+  // Charger les données réelles de la commande
+  const loadOrderData = async () => {
+    try {
+      setLoading(true);
+      
+      if (!user?.id) {
+        console.log('⚠️ Pas d\'utilisateur connecté');
+        return;
+      }
+
+      // Charger les commandes depuis le stockage
+      const userOrdersKey = `@pako_orders_${user.id}`;
+      const simpleOrders = await AsyncStorage.getItem(userOrdersKey);
+      const allOrders = simpleOrders ? JSON.parse(simpleOrders) : [];
+      
+      // Trouver la commande correspondante
+      const order = allOrders.find((o: any) => 
+        o.orderNumber === packageId || 
+        o.packageCode === packageId ||
+        o.packages?.some((p: any) => p.packageCode === packageId)
+      );
+
+      if (!order) {
+        console.log('⚠️ Commande non trouvée pour:', packageId);
+        // Utiliser des données par défaut si la commande n'est pas trouvée
+        setTrackingData(createDefaultTrackingData());
+        return;
+      }
+
+      // Récupérer la position actuelle de l'utilisateur
+      let currentLocation = {
+        latitude: 5.3599, // Plateau, Abidjan par défaut
+        longitude: -4.0083,
+        address: "Position actuelle"
+      };
+
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status === 'granted') {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          currentLocation = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+            address: "Ma position actuelle"
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Erreur récupération position:', error);
+      }
+
+      // Utiliser les coordonnées de livraison de la commande ou des coordonnées par défaut
+      const destination = {
+        latitude: order.deliveryLatitude || 5.3600,
+        longitude: order.deliveryLongitude || -4.0080,
+        address: order.deliveryAddress || "Adresse de livraison"
+      };
+
+      // Si pas de coordonnées de livraison, utiliser la gare de destination
+      if (!order.deliveryLatitude || !order.deliveryLongitude) {
+        if (order.stationLatitude && order.stationLongitude) {
+          destination.latitude = order.stationLatitude;
+          destination.longitude = order.stationLongitude;
+          destination.address = order.destinationStation || destination.address;
+        }
+      }
+
+      // Créer les données de suivi
+      const trackingData: TrackingData = {
+        packageId: packageId,
+        currentLocation: currentLocation,
+        destination: destination,
+        driver: {
+          name: order.driverName || "Livreur PAKO",
+          phone: order.driverPhone || "+225 00 00 00 00",
+          vehicle: order.driverVehicle || "Véhicule"
+        },
+        status: order.status === 'pending' ? 'En attente de livraison' : 
+                order.status === 'confirmed' ? 'Confirmé' :
+                order.status === 'in_transit' ? 'En cours de livraison' :
+                order.status === 'delivered' ? 'Livré' : 'En cours',
+        estimatedArrival: order.estimatedArrival || new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleTimeString('fr-FR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }),
+        progress: order.status === 'pending' ? 10 : 
+                  order.status === 'confirmed' ? 30 :
+                  order.status === 'in_transit' ? 60 :
+                  order.status === 'delivered' ? 100 : 50,
+        lastUpdate: order.updatedAt ? new Date(order.updatedAt).toLocaleTimeString('fr-FR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        }) : new Date().toLocaleTimeString('fr-FR', { 
+          hour: '2-digit', 
+          minute: '2-digit' 
+        })
+      };
+
+      setTrackingData(trackingData);
+      
+    } catch (error) {
+      console.error('❌ Erreur lors du chargement des données:', error);
+      setTrackingData(createDefaultTrackingData());
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Créer des données par défaut si aucune commande n'est trouvée
+  const createDefaultTrackingData = (): TrackingData => ({
     packageId: packageId,
     currentLocation: {
       latitude: 5.3599,
       longitude: -4.0083,
-      address: "Plateau, Abidjan - En route vers Cocody"
+      address: "Plateau, Abidjan"
     },
     destination: {
       latitude: 5.3600,
       longitude: -4.0080,
-      address: "Cocody, Abidjan - Adresse de livraison"
+      address: "Adresse de livraison"
     },
     driver: {
-      name: "Kouassi Jean",
-      phone: "+225 07 12 34 56 78",
-      vehicle: "Moto - AB-123-CD"
+      name: "Livreur PAKO",
+      phone: "+225 00 00 00 00",
+      vehicle: "Véhicule de livraison"
     },
     status: "En cours de livraison",
     estimatedArrival: "14:30",
-    progress: 75,
-    lastUpdate: "14:15"
-  };
+    progress: 50,
+    lastUpdate: new Date().toLocaleTimeString('fr-FR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    })
+  });
 
   useEffect(() => {
-    // Simulation du chargement des données
-    setTimeout(() => {
-      setTrackingData(mockTrackingData);
-    }, 1000);
+    loadOrderData();
 
-    // Simulation de mise à jour en temps réel
-    const interval = setInterval(() => {
-      if (isTracking && trackingData) {
-        // Simulation de progression
-        setTrackingData(prev => {
-          if (!prev) return prev;
-          const newProgress = Math.min(prev.progress + Math.random() * 5, 100);
-          const newTime = new Date().toLocaleTimeString('fr-FR', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
-          });
-          
-          return {
-            ...prev,
-            progress: newProgress,
-            lastUpdate: newTime,
-            status: newProgress >= 100 ? "Arrivé à destination" : "En cours de livraison"
-          };
-        });
-      }
-    }, 10000); // Mise à jour toutes les 10 secondes
-
-    return () => clearInterval(interval);
-  }, [isTracking, trackingData]);
+  }, [packageId, user?.id]);
 
   const showCallModalPopup = () => {
     setShowCallModal(true);
@@ -120,36 +213,6 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
     Alert.alert("Appel", `Appel vers ${trackingData?.driver.phone}`);
   };
 
-
-  const renderTrackingMap = () => {
-    if (!trackingData) return null;
-    
-    return (
-      <TrackingMap
-        currentLocation={trackingData.currentLocation}
-        destination={trackingData.destination}
-        driver={trackingData.driver}
-        progress={trackingData.progress}
-        onCallDriver={handleCallDriver}
-      />
-    );
-  };
-
-  const renderProgressBar = () => (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressHeader}>
-        <Text style={styles.progressTitle}>Progression de la livraison</Text>
-        <Text style={styles.progressPercentage}>{trackingData?.progress}%</Text>
-      </View>
-      <View style={styles.progressBar}>
-        <View style={[styles.progressFill, { width: `${trackingData?.progress || 0}%` }]} />
-      </View>
-      <Text style={styles.progressText}>
-        Arrivée estimée : {trackingData?.estimatedArrival}
-      </Text>
-    </View>
-  );
-
   const renderDriverInfo = () => (
     <View style={styles.driverContainer}>
       <Text style={styles.driverTitle}>👨‍💼 Informations du livreur</Text>
@@ -175,18 +238,15 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
     </View>
   );
 
-  if (!trackingData) {
+  if (loading || !trackingData) {
     return (
       <View style={styles.container}>
         <View style={styles.header}>
-          <TouchableOpacity onPress={() => navigation.goBack()}>
-            <Text style={styles.backButton}>← Retour</Text>
-          </TouchableOpacity>
           <Text style={styles.headerTitle}>Suivi du colis</Text>
-          <View style={styles.headerSpacer} />
         </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>🔄 Chargement du suivi...</Text>
+          <Text style={styles.loadingSubtext}>Chargement de la carte et de l'itinéraire...</Text>
         </View>
       </View>
     );
@@ -195,28 +255,28 @@ const PackageTrackingScreen: React.FC<PackageTrackingScreenProps> = ({ navigatio
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation.goBack()}>
-          <Text style={styles.backButton}>← Retour</Text>
-        </TouchableOpacity>
         <Text style={styles.headerTitle}>Suivi du colis {packageId}</Text>
-        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Carte avec itinéraire - AFFICHÉE EN PREMIER */}
+        <View style={styles.mapWrapper}>
+          <TrackingMap
+            currentLocation={trackingData.currentLocation}
+            destination={trackingData.destination}
+            driver={trackingData.driver}
+            progress={trackingData.progress}
+            onCallDriver={handleCallDriver}
+          />
+        </View>
+
         {/* Statut du colis */}
         <View style={styles.statusContainer}>
-          <Text style={styles.statusTitle}>📦 Statut actuel</Text>
+          <Text style={styles.statusTitle}>Statut actuel</Text>
           <View style={[styles.statusBadge, { backgroundColor: COLORS.primary }]}>
             <Text style={styles.statusText}>{trackingData.status}</Text>
           </View>
-          <Text style={styles.lastUpdate}>Dernière mise à jour : {trackingData.lastUpdate}</Text>
         </View>
-
-        {/* Carte de suivi intégrée */}
-        {renderTrackingMap()}
-
-        {/* Barre de progression */}
-        {renderProgressBar()}
 
         {/* Informations de livraison */}
         <View style={styles.deliveryInfo}>
@@ -309,22 +369,14 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  backButton: {
-    color: COLORS.primary,
-    fontSize: 16,
-    fontWeight: '500',
+    justifyContent: 'center',
   },
   headerTitle: {
     color: COLORS.primary,
     fontSize: 18,
     fontWeight: 'bold',
-  },
-  headerSpacer: {
-    width: 60,
+    textAlign: 'center',
   },
   content: {
     flex: 1,
@@ -334,10 +386,20 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    gap: 16,
   },
   loadingText: {
     fontSize: 18,
     color: COLORS.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: COLORS.textSecondary,
+    marginTop: 8,
+    textAlign: 'center',
+    fontStyle: 'italic',
   },
   statusContainer: {
     paddingVertical: 20,
@@ -360,9 +422,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
   },
-  lastUpdate: {
-    fontSize: 12,
-    color: COLORS.textSecondary,
+  mapWrapper: {
+    marginBottom: 20,
+    marginTop: 10,
   },
   mapContainer: {
     backgroundColor: COLORS.white,
@@ -391,54 +453,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: 'bold',
     color: COLORS.textPrimary,
-  },
-  progressContainer: {
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 20,
-    borderWidth: 1,
-    borderColor: COLORS.border,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 3.84,
-    elevation: 5,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  progressTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.textPrimary,
-  },
-  progressPercentage: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: COLORS.primary,
-  },
-  progressBar: {
-    height: 8,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 4,
-    marginBottom: 8,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: COLORS.primary,
-    borderRadius: 4,
-  },
-  progressText: {
-    fontSize: 14,
-    color: COLORS.textSecondary,
-    textAlign: 'center',
   },
   driverContainer: {
     backgroundColor: COLORS.white,

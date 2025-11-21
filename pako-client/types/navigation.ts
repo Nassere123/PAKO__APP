@@ -8,6 +8,8 @@ export type RootStackParamList = {
   PhoneVerification: { phone: string; isRegistration: boolean; firstName?: string; lastName?: string };
   Home: undefined;
   Profile: undefined;
+  FavoriteLocations: undefined;
+  Settings: undefined;
   PackageTracking: { packageId: string };
   History: undefined;
   MultiStepPackageRegistration: { editCart?: any };
@@ -26,6 +28,8 @@ export type AuthScreenProps = StackScreenProps<RootStackParamList, 'Auth'>;
 export type PhoneVerificationScreenProps = StackScreenProps<RootStackParamList, 'PhoneVerification'>;
 export type HomeScreenProps = StackScreenProps<RootStackParamList, 'Home'>;
 export type ProfileScreenProps = StackScreenProps<RootStackParamList, 'Profile'>;
+export type FavoriteLocationsScreenProps = StackScreenProps<RootStackParamList, 'FavoriteLocations'>;
+export type SettingsScreenProps = StackScreenProps<RootStackParamList, 'Settings'>;
 export type PackageTrackingScreenProps = StackScreenProps<RootStackParamList, 'PackageTracking'>;
 export type HistoryScreenProps = StackScreenProps<RootStackParamList, 'History'>;
 export type MultiStepPackageRegistrationScreenProps = StackScreenProps<RootStackParamList, 'MultiStepPackageRegistration'>;

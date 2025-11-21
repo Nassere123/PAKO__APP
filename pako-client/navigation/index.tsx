@@ -7,6 +7,8 @@ import {
   AuthScreen, 
   PhoneVerificationScreen, 
   ProfileScreen,
+  FavoriteLocationsScreen,
+  SettingsScreen,
   PackageTrackingScreen,
   HistoryScreen,
   MultiStepPackageRegistrationScreen,
@@ -41,14 +43,12 @@ const AppNavigator: React.FC = () => {
               animation: 'timing',
               config: {
                 duration: 200, // Réduit de 300ms à 200ms
-                useNativeDriver: true,
               },
             },
             close: {
               animation: 'timing',
               config: {
                 duration: 150, // Réduit de 250ms à 150ms
-                useNativeDriver: true,
               },
             },
           },
@@ -95,6 +95,16 @@ const AppNavigator: React.FC = () => {
           name="Profile"
           component={ProfileScreen}
           options={{ title: 'Mon Profil' }}
+        />
+        <Stack.Screen
+          name="FavoriteLocations"
+          component={FavoriteLocationsScreen}
+          options={{ title: 'Vos lieux de livraison', headerShown: false }}
+        />
+        <Stack.Screen
+          name="Settings"
+          component={SettingsScreen}
+          options={{ title: 'Paramètres', headerShown: false }}
         />
         <Stack.Screen
           name="PackageTracking"

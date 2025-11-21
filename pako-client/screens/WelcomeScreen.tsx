@@ -80,20 +80,18 @@ const WelcomeScreen: React.FC<WelcomeScreenProps> = ({ navigation, route }) => {
 
   const handleStartAdventure = async (): Promise<void> => {
     try {
-      // Créer l'utilisateur en local storage
-      await login({
-        firstName: firstName || 'Utilisateur',
-        lastName: lastName || '',
-        phone: phone || '',
-      });
-
-      // Navigation vers l'écran d'accueil principal
+      console.log('🚀 Démarrage de l\'aventure PAKO...');
+      console.log(`👤 Utilisateur: ${firstName} ${lastName}`);
+      console.log(`📞 Téléphone: ${phone}`);
+      
+      // L'utilisateur est déjà connecté à ce stade (via PhoneVerificationScreen)
+      // Navigation directe vers l'écran d'accueil principal
       navigation.reset({
         index: 0,
         routes: [{ name: 'Home' }],
       });
     } catch (error) {
-      console.error('Erreur lors de la connexion:', error);
+      console.error('Erreur lors de la navigation:', error);
       // Navigation quand même vers l'accueil en cas d'erreur
       navigation.reset({
         index: 0,

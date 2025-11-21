@@ -6,7 +6,8 @@ import { COLORS } from '../constants';
 import OSMSearchMap from '../components/OSMSearchMap';
 import { CustomHeader } from '../components';
 import { OrderService } from '../services/orderService';
-import { useAuth } from '../hooks/useAuth';
+import { useAuth, useTheme, useTranslation } from '../hooks';
+import { CountersService, PackageCounters } from '../services/countersService';
 
 interface HistoryItem {
   id: string;
@@ -19,11 +20,19 @@ interface HistoryItem {
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const { user } = useAuth();
+  const { colors } = useTheme();
+  const { t } = useTranslation();
   const [activeTab, setActiveTab] = useState<'home' | 'packages' | 'profile'>('home');
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const spinValue = useRef(new Animated.Value(0)).current;
   const [pressedCard, setPressedCard] = useState<string | null>(null);
+  const [counters, setCounters] = useState<PackageCounters>({
+    delivered: 0,
+    inProgress: 0,
+    cancelled: 0,
+    total: 0
+  });
   
   const [historyItems] = useState<HistoryItem[]>([
     {
@@ -76,15 +85,46 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const getStatusText = (status: string) => {
     switch (status) {
       case 'delivered':
-        return 'Livré';
+        return t('livré');
       case 'in_transit':
-        return 'En cours';
+        return t('en_cours');
       case 'pending':
-        return 'En attente';
+        return t('en_attente');
       default:
         return status;
     }
   };
+
+  /**
+   * Charge les compteurs de colis depuis l'API
+   */
+  const loadCounters = async () => {
+    try {
+      if (!user?.id) {
+        console.log('⚠️ Pas d\'utilisateur connecté');
+        setCounters({ delivered: 0, inProgress: 0, cancelled: 0, total: 0 });
+        return;
+      }
+      
+      const newCounters = await CountersService.getPackageCounters(user.id);
+      setCounters(newCounters);
+      console.log('✅ Compteurs chargés HomeScreen:', newCounters);
+      
+    } catch (error) {
+      console.error('❌ Erreur chargement compteurs HomeScreen:', error);
+    }
+  };
+
+  // Charger les compteurs au montage et quand l'écran est focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      loadCounters();
+    });
+    
+    loadCounters();
+    
+    return unsubscribe;
+  }, [navigation, user?.id]);
 
   const renderHistoryItem = ({ item }: { item: HistoryItem }) => (
     <TouchableOpacity style={styles.historyCard}>
@@ -106,6 +146,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     
     setIsRefreshing(true);
     setIsLoading(true);
+    
+    // Recharger les compteurs
+    await loadCounters();
     
     // Démarrer l'animation de rotation
     const spinAnimation = Animated.loop(
@@ -184,7 +227,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   const renderHomeContent = () => (
     <View style={styles.content}>
       {/* Header avec logo PAKO et position */}
-      <View style={styles.homeHeader}>
+      <View style={[styles.homeHeader, { backgroundColor: colors.white }]}>
         <View style={styles.logoContainer}>
           <Text style={styles.logoText}>PAKO</Text>
         </View>
@@ -224,8 +267,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
 
       {/* Section d'accroche */}
       <View style={styles.catchphraseSection}>
-        <Text style={styles.mainCatchphrase}>
-          Faites-vous livrer, où que vous soyez !
+        <Text style={[styles.mainCatchphrase, { color: colors.textPrimary }]}>
+          {t('welcome_message')}
         </Text>
       </View>
 
@@ -236,8 +279,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
           onPress={handleReceivePackage}
         >
           <View style={styles.actionButtonContent}>
-            <Text style={styles.primaryActionButtonText}>Recevoir mon colis</Text>
-            <Text style={styles.actionButtonSubtext}>Livraison à domicile</Text>
+            <Text style={styles.primaryActionButtonText}>{t('receive_package')}</Text>
+            <Text style={styles.actionButtonSubtext}>{t('delivery_at_home')}</Text>
           </View>
         </TouchableOpacity>
       </View>
@@ -249,7 +292,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
     <View style={[styles.content, (isRefreshing || isLoading) && styles.contentLoading]}>
       <View style={styles.packagesHeader}>
         <View style={styles.packagesTitleContainer}>
-          <Text style={styles.packagesTitle}>Mes colis enregistrés</Text>
+          <Text style={[styles.packagesTitle, { color: colors.textPrimary }]}>{t('my_registered_packages')}</Text>
         </View>
         <TouchableOpacity 
           onPress={handleRefresh} 
@@ -276,9 +319,9 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
       
       {/* Section Gérez vos colis */}
       <View style={styles.welcomeSection}>
-        <Text style={styles.welcomeTitle}>Gérez vos colis</Text>
-        <Text style={styles.welcomeSubtitle}>
-          Consultez le statut de vos colis et suivez leur livraison
+        <Text style={[styles.welcomeTitle, { color: colors.textPrimary }]}>{t('manage_packages')}</Text>
+        <Text style={[styles.welcomeSubtitle, { color: colors.textSecondary }]}>
+          {t('manage_packages_desc')}
         </Text>
       </View>
 
@@ -290,7 +333,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             style={[
               styles.optionCard, 
               styles.halfCard, 
-              { borderLeftColor: '#4CAF50' },
+              { borderLeftColor: '#4CAF50', backgroundColor: colors.white, borderColor: colors.border, shadowColor: colors.shadow },
               pressedCard === 'received' && styles.pressedCard
             ]}
             onPress={() => navigation.navigate('PackageList' as any, { category: 'received' })}
@@ -302,22 +345,22 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <View style={styles.optionTextContainer}>
                 <View style={styles.optionTitleContainer}>
                   <Text style={styles.optionIcon}>✓</Text>
-                  <Text style={styles.optionTitle}>Colis reçus</Text>
+                  <Text style={[styles.optionTitle, { color: colors.textPrimary }]}>{t('received_packages')}</Text>
                 </View>
-                <Text style={styles.optionDescription}>Colis livrés avec succès</Text>
+                <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{t('delivered_successfully')}</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#4CAF50' }]}>
-                <Text style={styles.countText}>3</Text>
+                <Text style={styles.countText}>{counters.delivered}</Text>
               </View>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <Text style={[styles.optionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
 
           <TouchableOpacity 
             style={[
               styles.optionCard, 
               styles.halfCard, 
-              { borderLeftColor: '#FF9800' },
+              { borderLeftColor: '#FF9800', backgroundColor: colors.white, borderColor: colors.border, shadowColor: colors.shadow },
               pressedCard === 'in_transit' && styles.pressedCard
             ]}
             onPress={() => navigation.navigate('PackageList' as any, { category: 'in_transit' })}
@@ -333,15 +376,15 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
                     style={styles.optionIconImage}
                     resizeMode="contain"
                   />
-                  <Text style={styles.optionTitle}>Colis en cours</Text>
+                  <Text style={[styles.optionTitle, { color: colors.textPrimary }]}>{t('in_transit_packages')}</Text>
                 </View>
-                <Text style={styles.optionDescription}>Colis en transit</Text>
+                <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{t('in_transit_desc')}</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#FF9800' }]}>
-                <Text style={styles.countText}>2</Text>
+                <Text style={styles.countText}>{counters.inProgress}</Text>
               </View>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <Text style={[styles.optionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
 
@@ -351,7 +394,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             style={[
               styles.optionCard, 
               styles.fullCard, 
-              { borderLeftColor: '#F44336' },
+              { borderLeftColor: '#F44336', backgroundColor: colors.white, borderColor: colors.border, shadowColor: colors.shadow },
               pressedCard === 'cancelled' && styles.pressedCard
             ]}
             onPress={() => navigation.navigate('PackageList' as any, { category: 'cancelled' })}
@@ -363,29 +406,17 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               <View style={styles.optionTextContainer}>
                 <View style={styles.optionTitleContainer}>
                   <Text style={styles.optionIcon}>🚫</Text>
-                  <Text style={styles.optionTitle}>Colis annulés</Text>
+                  <Text style={[styles.optionTitle, { color: colors.textPrimary }]}>{t('cancelled_packages')}</Text>
                 </View>
-                <Text style={styles.optionDescription}>Colis annulés ou retournés</Text>
+                <Text style={[styles.optionDescription, { color: colors.textSecondary }]}>{t('cancelled_desc')}</Text>
               </View>
               <View style={[styles.countBadge, { backgroundColor: '#F44336' }]}>
-                <Text style={styles.countText}>1</Text>
+                <Text style={styles.countText}>{counters.cancelled}</Text>
               </View>
             </View>
-            <Text style={styles.optionArrow}>›</Text>
+            <Text style={[styles.optionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
-      </View>
-
-      {/* Section Besoin d'aide */}
-      <View style={styles.helpSection}>
-        <Text style={styles.helpTitle}>Besoin d'aide ?</Text>
-        <Text style={styles.helpText}>
-          Si vous ne trouvez pas votre colis ou si vous avez des questions, 
-          contactez notre service client.
-        </Text>
-        <TouchableOpacity style={styles.helpButton}>
-          <Text style={styles.helpButtonText}>Contacter le support</Text>
-        </TouchableOpacity>
       </View>
     </View>
   );
@@ -403,11 +434,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
   };
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       
       {renderContent()}
 
-      <View style={styles.bottomNavigation}>
+      <View style={[styles.bottomNavigation, { backgroundColor: colors.white }]}>
         <TouchableOpacity
           style={[styles.navItem, activeTab === 'home' && styles.activeNavItem]}
           onPress={() => setActiveTab('home')}
@@ -417,7 +448,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             style={[styles.navIconHome, activeTab === 'home' && styles.activeNavIcon]} 
             resizeMode="contain"
           />
-          <Text style={[styles.navLabel, activeTab === 'home' && styles.activeNavLabel]}>Accueil</Text>
+          <Text style={[styles.navLabel, activeTab === 'home' && styles.activeNavLabel]}>{t('home')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -429,7 +460,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               style={[styles.navIcon, activeTab === 'packages' && styles.activeNavIcon]} 
               resizeMode="cover"
             />
-          <Text style={[styles.navLabel, activeTab === 'packages' && styles.activeNavLabel]}>Mes colis</Text>
+          <Text style={[styles.navLabel, activeTab === 'packages' && styles.activeNavLabel]}>{t('my_packages')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity
@@ -441,7 +472,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
             style={[styles.navIconHome, { opacity: 0.6 }]} 
             resizeMode="cover"
           />
-          <Text style={styles.navLabel}>Profil</Text>
+          <Text style={styles.navLabel}>{t('profile')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -452,7 +483,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
         animationType="fade"
       >
         <View style={styles.loadingOverlay}>
-          <View style={styles.loadingContainer}>
+          <View style={[styles.loadingContainer, { backgroundColor: colors.white }]}>
             <Animated.Image 
               source={require('../assets/refresh.png')}
               style={[
@@ -468,8 +499,8 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ navigation }) => {
               ]}
               resizeMode="contain"
             />
-            <Text style={styles.loadingTitle}>Actualisation en cours...</Text>
-            <Text style={styles.loadingSubtitle}>Chargement de vos colis</Text>
+            <Text style={styles.loadingTitle}>{t('refreshing')}</Text>
+            <Text style={[styles.loadingSubtitle, { color: colors.textSecondary }]}>{t('loading_packages')}</Text>
           </View>
         </View>
       </Modal>

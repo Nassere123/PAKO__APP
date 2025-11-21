@@ -1,14 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
-  Dimensions,
-  Alert,
+  Platform,
 } from 'react-native';
-import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, Region } from 'react-native-maps';
+import MapViewDirections from 'react-native-maps-directions';
+import { Ionicons } from '@expo/vector-icons';
 import { COLORS } from '../constants';
+import { GOOGLE_MAPS_API_KEY } from '../constants/api';
 
 interface TrackingMapProps {
   currentLocation: {
@@ -30,8 +31,6 @@ interface TrackingMapProps {
   onCallDriver: () => void;
 }
 
-const { width, height } = Dimensions.get('window');
-
 const TrackingMap: React.FC<TrackingMapProps> = ({
   currentLocation,
   destination,
@@ -39,83 +38,128 @@ const TrackingMap: React.FC<TrackingMapProps> = ({
   progress,
   onCallDriver,
 }) => {
-  const [region, setRegion] = useState({
-    latitude: currentLocation.latitude,
-    longitude: currentLocation.longitude,
-    latitudeDelta: 0.01,
-    longitudeDelta: 0.01,
-  });
+  const mapRef = useRef<MapView>(null);
 
+  // Calculer la région pour afficher les deux points
   useEffect(() => {
-    // Centrer la carte sur la position actuelle
-    setRegion({
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
-      latitudeDelta: 0.01,
-      longitudeDelta: 0.01,
-    });
-  }, [currentLocation]);
+    if (mapRef.current) {
+      const coordinates = [
+        {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        },
+        {
+          latitude: destination.latitude,
+          longitude: destination.longitude,
+        },
+      ];
 
-  const handleCallDriver = () => {
-    Alert.alert(
-      "Appeler le livreur",
-      `Voulez-vous appeler ${driver.name} ?`,
-      [
-        { text: "Annuler", style: "cancel" },
-        { 
-          text: "Appeler", 
-          onPress: onCallDriver
-        }
-      ]
-    );
-  };
+      // Calculer les limites de la région
+      const minLat = Math.min(...coordinates.map(c => c.latitude));
+      const maxLat = Math.max(...coordinates.map(c => c.latitude));
+      const minLng = Math.min(...coordinates.map(c => c.longitude));
+      const maxLng = Math.max(...coordinates.map(c => c.longitude));
 
-  // Coordonnées pour la route simulée
-  const routeCoordinates = [
-    {
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude,
-    },
-    {
-      latitude: destination.latitude,
-      longitude: destination.longitude,
-    },
-  ];
+      const padding = 0.01; // Padding pour ne pas coller aux bords
+      const region: Region = {
+        latitude: (minLat + maxLat) / 2,
+        longitude: (minLng + maxLng) / 2,
+        latitudeDelta: Math.max(maxLat - minLat + padding * 2, 0.01),
+        longitudeDelta: Math.max(maxLng - minLng + padding * 2, 0.01),
+      };
+
+      mapRef.current.fitToCoordinates(coordinates, {
+        edgePadding: {
+          top: 50,
+          right: 50,
+          bottom: 50,
+          left: 50,
+        },
+        animated: true,
+      });
+    }
+  }, [currentLocation, destination]);
 
   return (
     <View style={styles.container}>
-      <View style={styles.mapHeader}>
-        <Text style={styles.mapTitle}>📍 Suivi en temps réel</Text>
-        <TouchableOpacity style={styles.callButton} onPress={handleCallDriver}>
-          <Text style={styles.callIcon}>📞</Text>
-        </TouchableOpacity>
-      </View>
-
+      {/* Carte avec itinéraire */}
       <View style={styles.mapContainer}>
         <MapView
-          provider={PROVIDER_GOOGLE}
+          ref={mapRef}
           style={styles.map}
-          region={region}
+          initialRegion={{
+            latitude: currentLocation.latitude,
+            longitude: currentLocation.longitude,
+            latitudeDelta: 0.01,
+            longitudeDelta: 0.01,
+          }}
+          // Configuration pour Expo
+          // Expo Go: utilise la carte par défaut (OpenStreetMap/Apple Maps)
+          // Build personnalisé: Google Maps sur Android, carte par défaut sur iOS
+          provider={Platform.OS === 'android' ? 'google' : undefined}
           showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={true}
-          showsScale={true}
+          rotateEnabled={true}
+          scrollEnabled={true}
+          zoomEnabled={true}
+          pitchEnabled={false}
+          mapType="standard"
+          loadingEnabled={true}
+          liteMode={false}
+          onPress={(e) => {
+            // Empêcher l'ouverture de l'application externe
+            e.stopPropagation();
+          }}
         >
-          {/* Marqueur de la position actuelle du colis */}
+          {/* Itinéraire entre la position actuelle et la destination */}
+          <MapViewDirections
+            origin={{
+              latitude: currentLocation.latitude,
+              longitude: currentLocation.longitude,
+            }}
+            destination={{
+              latitude: destination.latitude,
+              longitude: destination.longitude,
+            }}
+            apikey={GOOGLE_MAPS_API_KEY}
+            strokeWidth={4}
+            strokeColor={COLORS.primary}
+            optimizeWaypoints={true}
+            onReady={(result) => {
+              // Ajuster la carte pour voir tout l'itinéraire
+              if (mapRef.current) {
+                mapRef.current.fitToCoordinates(result.coordinates, {
+                  edgePadding: {
+                    top: 50,
+                    right: 50,
+                    bottom: 50,
+                    left: 50,
+                  },
+                  animated: true,
+                });
+              }
+            }}
+            onError={(errorMessage) => {
+              console.log('Erreur lors du calcul de l\'itinéraire:', errorMessage);
+            }}
+          />
+
+          {/* Marqueur position actuelle */}
           <Marker
             coordinate={{
               latitude: currentLocation.latitude,
               longitude: currentLocation.longitude,
             }}
-            title="Position du colis"
+            title="Position actuelle"
             description={currentLocation.address}
           >
             <View style={styles.currentMarker}>
-              <Text style={styles.markerIcon}>🚚</Text>
+              <View style={styles.currentMarkerInner} />
             </View>
           </Marker>
 
-          {/* Marqueur de destination */}
+          {/* Marqueur destination */}
           <Marker
             coordinate={{
               latitude: destination.latitude,
@@ -125,23 +169,16 @@ const TrackingMap: React.FC<TrackingMapProps> = ({
             description={destination.address}
           >
             <View style={styles.destinationMarker}>
-              <Text style={styles.markerIcon}>🏠</Text>
+              <Ionicons name="location" size={24} color={COLORS.white} />
             </View>
           </Marker>
-
-          {/* Ligne de route */}
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor={COLORS.primary}
-            strokeWidth={4}
-            lineDashPattern={[5, 5]}
-          />
         </MapView>
       </View>
 
+      {/* Informations sous la carte */}
       <View style={styles.mapInfo}>
         <View style={styles.infoRow}>
-          <Text style={styles.infoIcon}>📍</Text>
+          <Ionicons name="location" size={20} color={COLORS.primary} style={styles.infoIcon} />
           <View style={styles.infoText}>
             <Text style={styles.infoLabel}>Position actuelle</Text>
             <Text style={styles.infoValue}>{currentLocation.address}</Text>
@@ -165,10 +202,10 @@ const TrackingMap: React.FC<TrackingMapProps> = ({
         </View>
 
         <View style={styles.progressContainer}>
-          <Text style={styles.progressLabel}>Progression : {progress}%</Text>
           <View style={styles.progressBar}>
             <View style={[styles.progressFill, { width: `${progress}%` }]} />
           </View>
+          <Text style={styles.progressText}>{progress}% complété</Text>
         </View>
       </View>
     </View>
@@ -179,62 +216,46 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  mapHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.border,
-  },
-  mapTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.textPrimary,
-  },
-  callButton: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 20,
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  callIcon: {
-    fontSize: 18,
-  },
   mapContainer: {
-    height: height * 0.4,
-    backgroundColor: COLORS.lightGray,
+    height: 350,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: COLORS.border,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.1,
+    shadowRadius: 3.84,
+    elevation: 5,
   },
   map: {
     ...StyleSheet.absoluteFillObject,
   },
   currentMarker: {
-    backgroundColor: COLORS.primary,
-    borderRadius: 25,
-    width: 50,
-    height: 50,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: COLORS.primary + '33',
+    borderWidth: 3,
+    borderColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: COLORS.white,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-    elevation: 5,
+  },
+  currentMarkerInner: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    backgroundColor: COLORS.primary,
   },
   destinationMarker: {
-    backgroundColor: '#4CAF50',
-    borderRadius: 25,
-    width: 50,
-    height: 50,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
@@ -244,16 +265,16 @@ const styles = StyleSheet.create({
       width: 0,
       height: 2,
     },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
     elevation: 5,
-  },
-  markerIcon: {
-    fontSize: 20,
   },
   mapInfo: {
     backgroundColor: COLORS.white,
     padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: COLORS.border,
   },
   infoRow: {
     flexDirection: 'row',
@@ -261,9 +282,9 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   infoIcon: {
-    fontSize: 20,
     marginRight: 12,
     width: 24,
+    fontSize: 20,
   },
   infoText: {
     flex: 1,
@@ -279,24 +300,27 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   progressContainer: {
-    marginTop: 8,
-  },
-  progressLabel: {
-    fontSize: 14,
-    color: COLORS.textPrimary,
-    fontWeight: '600',
-    marginBottom: 8,
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.border,
   },
   progressBar: {
-    height: 6,
+    height: 8,
     backgroundColor: COLORS.lightGray,
-    borderRadius: 3,
+    borderRadius: 4,
     overflow: 'hidden',
+    marginBottom: 8,
   },
   progressFill: {
     height: '100%',
     backgroundColor: COLORS.primary,
-    borderRadius: 3,
+    borderRadius: 4,
+  },
+  progressText: {
+    fontSize: 12,
+    color: COLORS.textSecondary,
+    textAlign: 'center',
   },
 });
 

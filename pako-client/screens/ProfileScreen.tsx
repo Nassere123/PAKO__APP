@@ -1,13 +1,12 @@
 // ============================================================================
 // IMPORTATIONS
 // ============================================================================
-import React, { useState } from 'react';
+import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { ProfileScreenProps } from '../types';
 import { COLORS } from '../constants';
-import { useAuth } from '../hooks';
-import { LogoutModal } from '../components';
+import { useAuth, useTheme, useTranslation } from '../hooks';
 
 // ============================================================================
 // COMPOSANT PRINCIPAL
@@ -24,72 +23,38 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
   // ============================================================================
   
   /** Hook d'authentification pour récupérer les données utilisateur */
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
   
-  /** État pour contrôler l'affichage du modal de déconnexion */
-  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  /** Hook pour gérer le thème de l'application */
+  const { colors } = useTheme();
   
-
-  // ============================================================================
-  // GESTIONNAIRES D'ÉVÉNEMENTS
-  // ============================================================================
-  
-  /**
-   * Affiche le modal de confirmation de déconnexion
-   */
-  const handleLogoutPress = (): void => {
-    setShowLogoutModal(true);
-  };
-
-  /**
-   * Confirme et exécute la déconnexion de l'utilisateur
-   * Redirige vers l'écran d'authentification après déconnexion
-   */
-  const handleLogoutConfirm = async (): Promise<void> => {
-    try {
-      setShowLogoutModal(false);
-      await logout();
-      // Réinitialise la pile de navigation pour éviter le retour
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Auth' }],
-      });
-    } catch (error) {
-      console.error('Erreur lors de la déconnexion:', error);
-    }
-  };
-
-  /**
-   * Annule la déconnexion et ferme le modal
-   */
-  const handleLogoutCancel = (): void => {
-    setShowLogoutModal(false);
-  };
+  /** Hook pour les traductions */
+  const { t } = useTranslation();
 
   // ============================================================================
   // RENDU PRINCIPAL
   // ============================================================================
   
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       {/* Contenu scrollable de l'écran de profil */}
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         {/* Section principale du profil utilisateur */}
         <View style={styles.section}>
-          <View style={styles.profileCard}>
+          <View style={[styles.profileCard, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}>
             <View style={styles.profileInfo}>
               <View style={styles.userNameContainer}>
-                <Text style={styles.userName}>
+                <Text style={[styles.userName, { color: colors.textPrimary }]}>
                   {user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
                 </Text>
-                <View style={styles.userInitialsContainer}>
+                <View style={[styles.userInitialsContainer, { backgroundColor: COLORS.primary }]}>
                   <Text style={styles.userInitials}>
                     {user ? `${user.firstName?.charAt(0) || ''}${user.lastName?.charAt(0) || ''}` : 'U'}
                   </Text>
                 </View>
               </View>
               {user?.email && (
-                <Text style={styles.userEmail}>{user.email}</Text>
+                <Text style={[styles.userEmail, { color: colors.textSecondary }]}>{user.email}</Text>
               )}
             </View>
           </View>
@@ -99,76 +64,55 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 
         {/* Section Adresses */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity 
+            style={[styles.actionItem, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}
+            onPress={() => navigation.navigate('FavoriteLocations' as any)}
+          >
             <Ionicons name="location-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
-            <Text style={styles.actionText}>Mes adresses</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <Text style={[styles.actionText, { color: colors.textPrimary }]}>{t('my_addresses')}</Text>
+            <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
 
         {/* Section Paiement */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}>
             <Ionicons name="card-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
             <View style={styles.actionTextContainer}>
-              <Text style={styles.actionText}>Modes de paiement</Text>
-              <Text style={styles.actionSubtext}>Espèces</Text>
+              <Text style={[styles.actionText, { color: colors.textPrimary }]}>{t('payment_methods')}</Text>
+              <Text style={[styles.actionSubtext, { color: colors.textSecondary }]}>Espèces</Text>
             </View>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionItem}>
-            <Ionicons name="gift-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
-            <View style={styles.actionTextContainer}>
-              <Text style={styles.actionText}>Réductions et cadeaux</Text>
-              <Text style={styles.actionSubtext}>Saisir un code promotionnel</Text>
-            </View>
-            <Text style={styles.actionArrow}>›</Text>
+            <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
 
         {/* Section Assistance */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}>
             <Ionicons name="headset-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
-            <Text style={styles.actionText}>Assistance</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <Text style={[styles.actionText, { color: colors.textPrimary }]}>{t('assistance')}</Text>
+            <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
           
-          <TouchableOpacity style={styles.actionItem}>
+          <TouchableOpacity style={[styles.actionItem, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}>
             <Ionicons name="information-circle-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
-            <Text style={styles.actionText}>Informations</Text>
-            <Text style={styles.actionArrow}>›</Text>
+            <Text style={[styles.actionText, { color: colors.textPrimary }]}>{t('information')}</Text>
+            <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
 
         {/* Section Paramètres */}
         <View style={styles.section}>
-          <TouchableOpacity style={styles.actionItem}>
-            <Ionicons name="settings-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
-            <Text style={styles.actionText}>Paramètres</Text>
-            <Text style={styles.actionArrow}>›</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Section de déconnexion avec bouton principal */}
-        <View style={styles.section}>
           <TouchableOpacity 
-            style={styles.logoutButton}
-            onPress={handleLogoutPress}
+            style={[styles.actionItem, { backgroundColor: colors.white, shadowColor: colors.shadow, borderColor: colors.border }]}
+            onPress={() => navigation.navigate('Settings' as any)}
           >
-            <Text style={styles.logoutText}>Se déconnecter</Text>
+            <Ionicons name="settings-outline" size={24} color={COLORS.primary} style={styles.iconOnly} />
+            <Text style={[styles.actionText, { color: colors.textPrimary }]}>{t('settings')}</Text>
+            <Text style={[styles.actionArrow, { color: colors.textSecondary }]}>›</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
-
-      {/* Modal de confirmation de déconnexion */}
-      <LogoutModal
-        visible={showLogoutModal}
-        onConfirm={handleLogoutConfirm}
-        onCancel={handleLogoutCancel}
-        userName={user ? `${user.firstName} ${user.lastName}` : 'Utilisateur'}
-      />
     </View>
   );
 };
@@ -184,7 +128,6 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   content: {
     flex: 1,
@@ -198,17 +141,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#000000',
     marginBottom: 12,
     marginLeft: 4,
   },
   profileCard: {
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     shadowOffset: {
       width: 0,
       height: 2,
@@ -228,14 +170,12 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: 'bold',
-    color: '#000000',
     flex: 1,
   },
   userInitialsContainer: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.primary,
     justifyContent: 'center',
     alignItems: 'center',
     marginLeft: 12,
@@ -247,16 +187,15 @@ const styles = StyleSheet.create({
   },
   userEmail: {
     fontSize: 14,
-    color: '#666666',
   },
   actionItem: {
-    backgroundColor: COLORS.white,
     borderRadius: 12,
     padding: 16,
     flexDirection: 'row',
     alignItems: 'center',
     marginBottom: 8,
-    shadowColor: '#000',
+    borderWidth: 1,
+    borderColor: '#E0E0E0',
     shadowOffset: {
       width: 0,
       height: 1,
@@ -270,12 +209,10 @@ const styles = StyleSheet.create({
   },
   actionText: {
     fontSize: 16,
-    color: '#000000',
     flex: 1,
   },
   actionArrow: {
     fontSize: 18,
-    color: '#CCCCCC',
     fontWeight: 'bold',
   },
   notificationDot: {
@@ -290,7 +227,6 @@ const styles = StyleSheet.create({
   },
   actionSubtext: {
     fontSize: 12,
-    color: '#666666',
     marginTop: 2,
   },
   logoutButton: {

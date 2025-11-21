@@ -1,0 +1,71 @@
+// Configuration Expo adaptative
+// Pour Expo Go, on simplifie la configuration
+// Pour les builds personnalisés, on utilise toute la configuration
+
+const IS_EXPO_GO = process.env.EXPO_PUBLIC_USE_GO === 'true';
+
+module.exports = {
+  expo: {
+    name: "PAKO",
+    slug: "pako-client",
+    version: "1.0.0",
+    extra: {
+      eas: {
+        projectId: "68a570e8-6855-4c26-b652-ce584caa3391"
+      }
+    },
+    orientation: "portrait",
+    icon: "./assets/icon.png",
+    userInterfaceStyle: "light",
+    newArchEnabled: false,
+    splash: {
+      image: "./assets/splash-icon.png",
+      resizeMode: "contain",
+      backgroundColor: "#ffffff"
+    },
+    ios: IS_EXPO_GO ? {
+      supportsTablet: true,
+    } : {
+      supportsTablet: true,
+      config: {
+        googleMapsApiKey: "AIzaSyC-bVoeZI6vktP-Jd0YwQVEOFRlAeTdTp0"
+      },
+      infoPlist: {
+        NSLocationWhenInUseUsageDescription: "Cette application a besoin de votre position pour afficher l'itinéraire de livraison.",
+        NSLocationAlwaysUsageDescription: "Cette application a besoin de votre position pour afficher l'itinéraire de livraison."
+      }
+    },
+    android: IS_EXPO_GO ? {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ]
+    } : {
+      adaptiveIcon: {
+        foregroundImage: "./assets/adaptive-icon.png",
+        backgroundColor: "#ffffff"
+      },
+      edgeToEdgeEnabled: true,
+      config: {
+        googleMaps: {
+          apiKey: "AIzaSyC-bVoeZI6vktP-Jd0YwQVEOFRlAeTdTp0"
+        }
+      },
+      permissions: [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "READ_CONTACTS",
+        "WRITE_CONTACTS"
+      ],
+      package: "com.anonymous.pakoclient"
+    },
+    web: {
+      favicon: "./assets/favicon.png"
+    }
+  }
+};
+

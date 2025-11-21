@@ -1,5 +1,5 @@
 // Calculateur de prix de livraison pour PAKO
-// Prix de base : 500 FCFA par kilomètre
+// Prix de base : 200 FCFA par kilomètre
 // Supplément multi-colis : 5% du prix de base pour chaque colis supplémentaire
 
 export interface PricingResult {
@@ -14,7 +14,7 @@ export interface PricingResult {
 }
 
 export class PricingCalculator {
-  private static readonly PRICE_PER_KM = 500; // FCFA par kilomètre
+  private static readonly PRICE_PER_KM = 200; // FCFA par kilomètre
   private static readonly MULTI_PACKAGE_SURCHARGE_PERCENT = 5; // 5% de supplément
   private static readonly EXPRESS_CHARGE = 2000; // 2000 FCFA pour livraison express
 

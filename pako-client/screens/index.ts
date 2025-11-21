@@ -5,6 +5,8 @@ export { default as HomeScreen } from './HomeScreen';
 export { default as AuthScreen } from './AuthScreen';
 export { default as PhoneVerificationScreen } from './PhoneVerificationScreen';
 export { default as ProfileScreen } from './ProfileScreen';
+export { default as FavoriteLocationsScreen } from './FavoriteLocationsScreen';
+export { default as SettingsScreen } from './SettingsScreen';
 export { default as PackageTrackingScreen } from './PackageTrackingScreen';
 export { default as HistoryScreen } from './HistoryScreen';
 export { default as MultiStepPackageRegistrationScreen } from './MultiStepPackageRegistrationScreen';
