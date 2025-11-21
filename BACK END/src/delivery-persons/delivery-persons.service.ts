@@ -11,15 +11,30 @@ export class DeliveryPersonsService {
   ) {}
 
   async findAll(): Promise<DeliveryPerson[]> {
-    return this.deliveryPersonsRepository.find({
-      relations: ['user'],
+    const deliveryPersons = await this.deliveryPersonsRepository.find({
+      relations: ['vehicles'],
     });
+    
+    console.log(`[DeliveryPersonsService] findAll() - Trouvé ${deliveryPersons.length} livreurs`);
+    if (deliveryPersons.length > 0) {
+      console.log(`[DeliveryPersonsService] Premier livreur:`, {
+        id: deliveryPersons[0].id,
+        firstName: deliveryPersons[0].firstName,
+        lastName: deliveryPersons[0].lastName,
+        phone: deliveryPersons[0].phone,
+        isActive: deliveryPersons[0].isActive,
+        isOnline: deliveryPersons[0].isOnline,
+        status: deliveryPersons[0].status,
+      });
+    }
+    
+    return deliveryPersons;
   }
 
   async findOne(id: string): Promise<DeliveryPerson> {
     const deliveryPerson = await this.deliveryPersonsRepository.findOne({
       where: { id },
-      relations: ['user'],
+      relations: ['vehicles'],
     });
     if (!deliveryPerson) {
       throw new NotFoundException(`Livreur avec l'ID ${id} non trouvé`);
@@ -27,23 +42,52 @@ export class DeliveryPersonsService {
     return deliveryPerson;
   }
 
-  async findByUserId(userId: string): Promise<DeliveryPerson | null> {
+  async findByPhone(phone: string): Promise<DeliveryPerson | null> {
     return this.deliveryPersonsRepository.findOne({
-      where: { userId },
-      relations: ['user'],
+      where: { phone },
+      relations: ['vehicles'],
     });
   }
 
   async findAvailable(): Promise<DeliveryPerson[]> {
-    return this.deliveryPersonsRepository.find({
-      where: { status: DeliveryPersonStatus.AVAILABLE, isActive: true },
-      relations: ['user'],
+    // Récupérer uniquement les livreurs connectés (isOnline = true) et actifs
+    const deliveryPersons = await this.deliveryPersonsRepository.find({
+      where: { 
+        isOnline: true,
+        isActive: true,
+      },
+      relations: ['vehicles'],
     });
+    
+    console.log(`[DeliveryPersonsService] findAvailable() - Trouvé ${deliveryPersons.length} livreurs connectés`);
+    
+    return deliveryPersons;
   }
 
   async create(deliveryPersonData: Partial<DeliveryPerson>): Promise<DeliveryPerson> {
+    // Créer l'entrée dans la table drivers
     const deliveryPerson = this.deliveryPersonsRepository.create(deliveryPersonData);
-    return this.deliveryPersonsRepository.save(deliveryPerson);
+    const savedDriver = await this.deliveryPersonsRepository.save(deliveryPerson);
+    
+    // Charger les relations pour le retour
+    return this.findOne(savedDriver.id);
+  }
+
+  async updateOnlineStatus(id: string, isOnline: boolean): Promise<DeliveryPerson> {
+    const updateData: Partial<DeliveryPerson> = {
+      isOnline,
+    };
+    
+    if (isOnline) {
+      updateData.lastLoginAt = new Date();
+      updateData.status = DeliveryPersonStatus.AVAILABLE;
+    } else {
+      updateData.lastLogoutAt = new Date();
+      updateData.status = DeliveryPersonStatus.OFFLINE;
+    }
+    
+    await this.deliveryPersonsRepository.update(id, updateData);
+    return this.findOne(id);
   }
 
   async update(id: string, deliveryPersonData: Partial<DeliveryPerson>): Promise<DeliveryPerson> {

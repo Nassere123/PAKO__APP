@@ -5,6 +5,7 @@ import { Order, OrderStatus } from './entities/order.entity';
 import { Package } from '../packages/entities/package.entity';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { User } from '../users/entities/user.entity';
+import { PricingService } from './pricing.service';
 
 @Injectable()
 export class OrdersService {
@@ -21,6 +22,24 @@ export class OrdersService {
     return this.ordersRepository.find({
       relations: ['customer', 'packages'],
     });
+  }
+
+  async findByUserId(userId: string): Promise<Order[]> {
+    console.log('🔍 === RECHERCHE COMMANDES UTILISATEUR ===');
+    console.log('👤 User ID:', userId);
+    
+    const orders = await this.ordersRepository.find({
+      where: { customerId: userId },
+      relations: ['customer', 'packages'],
+      order: { createdAt: 'DESC' }, // Plus récentes en premier
+    });
+    
+    console.log('📊 Commandes trouvées:', orders.length);
+    orders.forEach(order => {
+      console.log(`   📦 ${order.orderNumber} - Status: ${order.status} - Prix: ${order.totalPrice} FCFA`);
+    });
+    
+    return orders;
   }
 
   async findOne(id: string): Promise<Order> {
@@ -90,7 +109,7 @@ export class OrdersService {
     console.log(`   📦 Nombre de colis: ${createOrderDto.packages.length}`);
     console.log(`   🚚 Type de livraison: ${createOrderDto.deliveryType}`);
     console.log(`   💳 Méthode de paiement: ${createOrderDto.paymentMethod}`);
-    console.log(`   💰 Prix total: ${createOrderDto.totalPrice || 0} FCFA`);
+    console.log(`   💰 Prix reçu du client: ${createOrderDto.totalPrice || 0} FCFA (sera ignoré - calcul côté serveur)`);
     
     console.log('\n📦 Détails des colis:');
     createOrderDto.packages.forEach((pkg, index) => {
@@ -126,6 +145,35 @@ export class OrdersService {
       console.log(`    Distance: ${calculatedDistance} km`);
     } else {
       console.log(`\n⚠️  Coordonnées manquantes, distance non calculée`);
+    }
+
+    // 🔒 SÉCURITÉ: Calculer le prix côté serveur (ignorer le prix du client)
+    let calculatedPrice = 0;
+    if (calculatedDistance && calculatedDistance > 0) {
+      const packageCount = createOrderDto.packages?.length || 0;
+      const isExpress = createOrderDto.deliveryType === 'express';
+      
+      const pricingResult = PricingService.calculateDeliveryPrice(
+        calculatedDistance,
+        packageCount,
+        isExpress
+      );
+      
+      calculatedPrice = pricingResult.totalPrice;
+      
+      console.log(`\n💰 === CALCUL SÉCURISÉ DU PRIX ===`);
+      console.log(`   📏 Distance: ${calculatedDistance} km`);
+      console.log(`   📦 Nombre de colis: ${packageCount}`);
+      console.log(`   🚚 Type: ${isExpress ? 'Express' : 'Standard'}`);
+      console.log(`   💵 Prix de base: ${pricingResult.basePrice} FCFA`);
+      console.log(`   💰 Supplément multi-colis: ${pricingResult.multiPackageSurcharge} FCFA`);
+      console.log(`   ⚡ Supplément express: ${pricingResult.expressCharge} FCFA`);
+      console.log(`   💵 PRIX TOTAL CALCULÉ: ${calculatedPrice} FCFA`);
+      console.log(`   ⚠️  Prix reçu du client: ${createOrderDto.totalPrice || 0} FCFA (IGNORÉ)`);
+      console.log(`==============================\n`);
+    } else {
+      console.log(`\n⚠️  Impossible de calculer le prix (distance manquante ou invalide)`);
+      throw new BadRequestException('La distance est requise pour calculer le prix de livraison');
     }
 
     // Générer un numéro de commande unique
@@ -165,7 +213,7 @@ export class OrdersService {
       deliveryType: createOrderDto.deliveryType,
       paymentMethod: createOrderDto.paymentMethod,
       status: OrderStatus.PENDING,
-      totalPrice: createOrderDto.totalPrice || 0,
+      totalPrice: calculatedPrice, // 🔒 Utiliser le prix calculé côté serveur
     });
 
     const savedOrder = await this.ordersRepository.save(order);
@@ -205,7 +253,7 @@ export class OrdersService {
     console.log(`\n✅ Commande créée avec succès!`);
     console.log(`   🆔 ID: ${savedOrder.id}`);
     console.log(`   📦 Nombre de colis créés: ${packages.length}`);
-    console.log(`   💰 Prix final: ${createOrderDto.totalPrice || 0} FCFA`);
+    console.log(`   💰 Prix final: ${calculatedPrice} FCFA`);
     console.log('=====================================\n');
 
     // Récupérer la commande complète avec tous les détails
@@ -271,5 +319,60 @@ export class OrdersService {
   async remove(id: string): Promise<void> {
     const order = await this.findOne(id);
     await this.ordersRepository.remove(order);
+  }
+
+  /**
+   * Récupère les compteurs de colis par statut pour un utilisateur
+   * @param userId ID de l'utilisateur
+   * @returns Compteurs par statut
+   */
+  async getOrderCountsByStatus(userId: string): Promise<{
+    delivered: number;
+    inProgress: number;
+    cancelled: number;
+    total: number;
+  }> {
+    console.log('📊 === COMPTAGE COLIS PAR STATUT ===');
+    console.log('👤 User ID:', userId);
+
+    // Récupérer toutes les commandes de l'utilisateur
+    const allOrders = await this.ordersRepository.find({
+      where: { customerId: userId },
+    });
+
+    console.log('📦 Total commandes trouvées:', allOrders.length);
+
+    // Compter par statut
+    const delivered = allOrders.filter(order => 
+      order.status === OrderStatus.DELIVERED
+    ).length;
+
+    const inProgress = allOrders.filter(order => 
+      order.status === OrderStatus.PENDING || 
+      order.status === OrderStatus.CONFIRMED || 
+      order.status === OrderStatus.IN_TRANSIT
+    ).length;
+
+    const cancelled = allOrders.filter(order => 
+      order.status === OrderStatus.CANCELLED
+    ).length;
+
+    const total = allOrders.length;
+
+    const counts = {
+      delivered,
+      inProgress,
+      cancelled,
+      total
+    };
+
+    console.log('📊 Compteurs calculés:');
+    console.log('   🟢 Livrés:', delivered);
+    console.log('   🟡 En cours:', inProgress);
+    console.log('   🔴 Annulés:', cancelled);
+    console.log('   📦 Total:', total);
+    console.log('===============================');
+
+    return counts;
   }
 }

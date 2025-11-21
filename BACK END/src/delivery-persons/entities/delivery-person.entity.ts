@@ -1,7 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany, OneToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, OneToMany } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
-import { User } from '../../users/entities/user.entity';
-import { Order } from '../../orders/entities/order.entity';
 import { Vehicle } from '../../vehicles/entities/vehicle.entity';
 import { Mission } from '../../missions/entities/mission.entity';
 import { Evaluation } from '../../evaluations/entities/evaluation.entity';
@@ -19,15 +17,31 @@ export enum VehicleType {
   TRUCK = 'truck',
 }
 
-@Entity('delivery_persons')
+@Entity('drivers')
 export class DeliveryPerson {
   @ApiProperty({ description: 'ID unique du livreur' })
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @ApiProperty({ description: 'ID de l\'utilisateur associé' })
-  @Column({ type: 'uuid' })
-  userId: string;
+  @ApiProperty({ description: 'Prénom du livreur' })
+  @Column({ type: 'varchar', length: 100 })
+  firstName: string;
+
+  @ApiProperty({ description: 'Nom du livreur' })
+  @Column({ type: 'varchar', length: 100 })
+  lastName: string;
+
+  @ApiProperty({ description: 'Numéro de téléphone du livreur' })
+  @Column({ type: 'varchar', length: 20, unique: true })
+  phone: string;
+
+  @ApiProperty({ description: 'Email du livreur' })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email?: string;
+
+  @ApiProperty({ description: 'Mot de passe (hashé)' })
+  @Column({ type: 'varchar', length: 255 })
+  password: string;
 
   @ApiProperty({ description: 'Numéro de permis de conduire' })
   @Column({ type: 'varchar', length: 50, unique: true })
@@ -37,29 +51,17 @@ export class DeliveryPerson {
   @Column({ type: 'enum', enum: DeliveryPersonStatus, default: DeliveryPersonStatus.OFFLINE })
   status: DeliveryPersonStatus;
 
-  @ApiProperty({ description: 'Type de véhicule', enum: VehicleType })
-  @Column({ type: 'enum', enum: VehicleType })
-  vehicleType: VehicleType;
+  @ApiProperty({ description: 'Livreur en ligne' })
+  @Column({ type: 'boolean', default: false })
+  isOnline: boolean;
 
-  @ApiProperty({ description: 'Marque du véhicule' })
-  @Column({ type: 'varchar', length: 100 })
-  vehicleBrand: string;
+  @ApiProperty({ description: 'Date de dernière connexion' })
+  @Column({ type: 'timestamp', nullable: true })
+  lastLoginAt?: Date;
 
-  @ApiProperty({ description: 'Modèle du véhicule' })
-  @Column({ type: 'varchar', length: 100 })
-  vehicleModel: string;
-
-  @ApiProperty({ description: 'Numéro de plaque d\'immatriculation' })
-  @Column({ type: 'varchar', length: 20, unique: true })
-  plateNumber: string;
-
-  @ApiProperty({ description: 'Couleur du véhicule' })
-  @Column({ type: 'varchar', length: 50 })
-  vehicleColor: string;
-
-  @ApiProperty({ description: 'Capacité de charge en kg' })
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
-  maxLoadCapacity: number;
+  @ApiProperty({ description: 'Date de dernière déconnexion' })
+  @Column({ type: 'timestamp', nullable: true })
+  lastLogoutAt?: Date;
 
   @ApiProperty({ description: 'Latitude actuelle' })
   @Column({ type: 'decimal', precision: 10, scale: 8, nullable: true })
@@ -90,12 +92,6 @@ export class DeliveryPerson {
   updatedAt: Date;
 
   // Relations
-  @OneToOne(() => User)
-  @JoinColumn({ name: 'userId' })
-  user: User;
-
-  // Note: Relation supprimée car deliveryPerson n'existe plus dans Order
-
   @OneToMany(() => Vehicle, vehicle => vehicle.deliveryPerson)
   vehicles: Vehicle[];
 

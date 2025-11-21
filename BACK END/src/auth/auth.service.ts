@@ -2,12 +2,17 @@ import { Injectable, UnauthorizedException, BadRequestException, ConflictExcepti
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import * as bcrypt from 'bcryptjs';
 import { User, UserType, UserStatus } from '../users/entities/user.entity';
+import { DeliveryPerson } from '../delivery-persons/entities/delivery-person.entity';
+import { StationAgent } from '../station-agents/entities/station-agent.entity';
 import { UsersService } from '../users/users.service';
+import { DeliveryPersonsService } from '../delivery-persons/delivery-persons.service';
 import { SendOtpDto } from './dto/send-otp.dto';
 import { VerifyOtpDto } from './dto/verify-otp.dto';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { CreateWorkerDto } from './dto/create-worker.dto';
 
 // Les DTOs sont maintenant dans des fichiers séparés
 
@@ -16,7 +21,12 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private userRepository: Repository<User>,
+    @InjectRepository(DeliveryPerson)
+    private deliveryPersonRepository: Repository<DeliveryPerson>,
+    @InjectRepository(StationAgent)
+    private stationAgentRepository: Repository<StationAgent>,
     private usersService: UsersService,
+    private deliveryPersonsService: DeliveryPersonsService,
     private jwtService: JwtService,
   ) {}
 
@@ -312,11 +322,15 @@ export class AuthService {
       });
     }
 
-    // Nettoyer le code OTP après connexion réussie
+    // Nettoyer le code OTP et marquer comme connecté
     await this.userRepository.update(user.id, {
       otpCode: null,
       otpExpires: null,
+      isOnline: true,
+      lastLoginAt: new Date(),
     });
+
+    console.log(`✅ Utilisateur ${user.firstName} ${user.lastName} connecté à ${new Date().toLocaleString('fr-FR')}`);
 
     const payload = { sub: user.id, phone: user.phone, userType: user.userType };
     const access_token = this.jwtService.sign(payload);
@@ -397,5 +411,303 @@ export class AuthService {
       }
       throw error;
     }
+  }
+
+  async logout(userId: string): Promise<{ message: string }> {
+    try {
+      // Essayer d'abord de trouver un utilisateur classique (table users)
+      const user = await this.userRepository.findOne({ where: { id: userId } });
+
+      if (user) {
+        await this.userRepository.update(user.id, {
+          isOnline: false,
+          lastLogoutAt: new Date(),
+        });
+
+        console.log('\n🚪 ===== DÉCONNEXION UTILISATEUR =====');
+        console.log(`👤 Utilisateur: ${user.firstName} ${user.lastName}`);
+        console.log(`📞 Téléphone: ${user.phone}`);
+        console.log(`⏰ Heure de déconnexion: ${new Date().toLocaleString('fr-FR')}`);
+        console.log(`🆔 ID utilisateur: ${user.id}`);
+        console.log('=====================================\n');
+
+        await this.displayAllUsersStatus();
+
+        return { message: 'Déconnexion réussie' };
+      }
+
+      // Si aucun utilisateur classique, vérifier dans la table station_agents
+      const stationAgent = await this.stationAgentRepository.findOne({ where: { id: userId } });
+      if (stationAgent) {
+        await this.stationAgentRepository.update(stationAgent.id, {
+          isOnline: false,
+          lastLogoutAt: new Date(),
+        });
+
+        console.log('\n🚪 ===== DÉCONNEXION AGENT DE GARE =====');
+        console.log(`👤 Agent: ${stationAgent.firstName} ${stationAgent.lastName}`);
+        console.log(`📞 Téléphone: ${stationAgent.phone}`);
+        console.log(`⏰ Heure de déconnexion: ${new Date().toLocaleString('fr-FR')}`);
+        console.log(`🆔 ID agent: ${stationAgent.id}`);
+        console.log('=====================================\n');
+
+        return { message: 'Déconnexion réussie' };
+      }
+
+      throw new BadRequestException('Utilisateur non trouvé');
+    } catch (error) {
+      if (error instanceof NotFoundException) {
+        throw new BadRequestException('Utilisateur non trouvé');
+      }
+      throw error;
+    }
+  }
+
+  async getAllUsersStatus(): Promise<{ 
+    connectedUsers: Partial<User>[], 
+    disconnectedUsers: Partial<User>[],
+    stats: {
+      totalUsers: number,
+      connectedCount: number,
+      disconnectedCount: number
+    }
+  }> {
+    const allUsers = await this.userRepository.find({
+      where: { status: UserStatus.ACTIVE },
+      order: { lastLoginAt: 'DESC' }
+    });
+
+    const connectedUsers = allUsers
+      .filter(user => user.isOnline)
+      .map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        email: user.email,
+        isOnline: user.isOnline,
+        lastLoginAt: user.lastLoginAt,
+        lastLogoutAt: user.lastLogoutAt,
+      }));
+
+    const disconnectedUsers = allUsers
+      .filter(user => !user.isOnline)
+      .map(user => ({
+        id: user.id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        phone: user.phone,
+        email: user.email,
+        isOnline: user.isOnline,
+        lastLoginAt: user.lastLoginAt,
+        lastLogoutAt: user.lastLogoutAt,
+      }));
+
+    return {
+      connectedUsers,
+      disconnectedUsers,
+      stats: {
+        totalUsers: allUsers.length,
+        connectedCount: connectedUsers.length,
+        disconnectedCount: disconnectedUsers.length
+      }
+    };
+  }
+
+  private async displayAllUsersStatus(): Promise<void> {
+    const usersStatus = await this.getAllUsersStatus();
+    
+    console.log('\n📊 ===== ÉTAT DES CONNEXIONS =====');
+    console.log(`📈 Total utilisateurs: ${usersStatus.stats.totalUsers}`);
+    console.log(`🟢 Connectés: ${usersStatus.stats.connectedCount}`);
+    console.log(`🔴 Déconnectés: ${usersStatus.stats.disconnectedCount}`);
+    
+    if (usersStatus.connectedUsers.length > 0) {
+      console.log('\n🟢 UTILISATEURS CONNECTÉS:');
+      usersStatus.connectedUsers.forEach((user, index) => {
+        const loginTime = user.lastLoginAt ? 
+          new Date(user.lastLoginAt).toLocaleString('fr-FR') : 'Jamais';
+        console.log(`   ${index + 1}. ${user.firstName} ${user.lastName} (${user.phone})`);
+        console.log(`      📅 Dernière connexion: ${loginTime}`);
+      });
+    }
+
+    if (usersStatus.disconnectedUsers.length > 0) {
+      console.log('\n🔴 UTILISATEURS DÉCONNECTÉS:');
+      usersStatus.disconnectedUsers.slice(0, 10).forEach((user, index) => { // Limiter à 10 pour éviter le spam
+        const logoutTime = user.lastLogoutAt ? 
+          new Date(user.lastLogoutAt).toLocaleString('fr-FR') : 'Jamais';
+        const loginTime = user.lastLoginAt ? 
+          new Date(user.lastLoginAt).toLocaleString('fr-FR') : 'Jamais';
+        console.log(`   ${index + 1}. ${user.firstName} ${user.lastName} (${user.phone})`);
+        console.log(`      📅 Dernière connexion: ${loginTime}`);
+        console.log(`      🚪 Dernière déconnexion: ${logoutTime}`);
+      });
+      
+      if (usersStatus.disconnectedUsers.length > 10) {
+        console.log(`   ... et ${usersStatus.disconnectedUsers.length - 10} autres utilisateurs déconnectés`);
+      }
+    }
+    
+    console.log('==================================\n');
+  }
+
+  async createWorker(createWorkerDto: CreateWorkerDto): Promise<{ message: string; user: Partial<User> }> {
+    const { firstName, lastName, phone, password, userType, email } = createWorkerDto;
+
+    // Vérifier si l'utilisateur existe déjà
+    const existingUser = await this.userRepository.findOne({
+      where: { phone }
+    });
+
+    if (existingUser) {
+      throw new ConflictException('Un utilisateur avec ce numéro de téléphone existe déjà');
+    }
+
+    // Vérifier que le type est bien un type de travailleur
+    if (userType === UserType.CUSTOMER) {
+      throw new BadRequestException('Ce endpoint est réservé aux travailleurs (livreurs et agents)');
+    }
+
+    // Hasher le mot de passe
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    // Créer l'utilisateur
+    const newUser = await this.userRepository.save({
+      firstName: firstName.trim(),
+      lastName: lastName.trim(),
+      phone,
+      email: email?.trim(),
+      password: hashedPassword,
+      userType,
+      status: UserStatus.ACTIVE,
+      isVerified: true,
+      isOnline: false,
+    });
+
+    console.log(`✅ Travailleur créé: ${newUser.firstName} ${newUser.lastName} (${newUser.phone}) - Type: ${newUser.userType}`);
+
+    return {
+      message: 'Travailleur créé avec succès',
+      user: {
+        id: newUser.id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        phone: newUser.phone,
+        email: newUser.email,
+        userType: newUser.userType,
+        status: newUser.status,
+      }
+    };
+  }
+
+  async loginWorker(loginWorkerDto: { phone: string; password: string }): Promise<{ access_token: string; user: Partial<User> }> {
+    const { phone, password } = loginWorkerDto;
+
+    console.log('=== DEBUG LOGIN WORKER (Agent de gare) ===');
+    console.log('Phone:', phone);
+    console.log('=======================');
+
+    // Trouver l'agent de gare par téléphone dans la table station_agents
+    const agent = await this.stationAgentRepository.findOne({
+      where: { phone }
+    });
+
+    // Si l'agent n'existe pas, retourner un message spécifique
+    if (!agent) {
+      throw new NotFoundException('Compte inexistant, veuillez contacter l\'admin');
+    }
+
+    // Vérifier le mot de passe
+    const isPasswordValid = await bcrypt.compare(password, agent.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Numéro ou mot de passe incorrect');
+    }
+
+    // Vérifier que le compte est actif
+    if (!agent.isActive) {
+      throw new UnauthorizedException('Votre compte est inactif. Contactez l\'administrateur.');
+    }
+
+    // Mettre à jour le statut de connexion dans station_agents
+    await this.stationAgentRepository.update(agent.id, {
+      isOnline: true,
+      lastLoginAt: new Date(),
+    });
+
+    console.log(`✅ Agent de gare ${agent.firstName} ${agent.lastName} connecté à ${new Date().toLocaleString('fr-FR')}`);
+
+    const payload = { sub: agent.id, phone: agent.phone, role: 'station_agent' };
+    const access_token = this.jwtService.sign(payload);
+
+    return {
+      access_token,
+      user: {
+        id: agent.id,
+        firstName: agent.firstName,
+        lastName: agent.lastName,
+        phone: agent.phone,
+        email: agent.email,
+        userType: UserType.STATION_AGENT,
+        isVerified: true,
+      }
+    };
+  }
+
+  async loginDriver(loginDriverDto: { phone: string; password: string }): Promise<{ access_token: string; driver: Partial<DeliveryPerson> }> {
+    const { phone, password } = loginDriverDto;
+
+    console.log('=== DEBUG LOGIN DRIVER ===');
+    console.log('Phone:', phone);
+    console.log('=======================');
+
+    // Trouver le livreur par téléphone
+    const driver = await this.deliveryPersonRepository.findOne({
+      where: { phone },
+    });
+
+    // Si le livreur n'existe pas, retourner un message spécifique
+    if (!driver) {
+      throw new NotFoundException('Compte inexistant, veuillez contacter l\'admin');
+    }
+
+    // Vérifier le mot de passe
+    const isPasswordValid = await bcrypt.compare(password, driver.password);
+    if (!isPasswordValid) {
+      throw new UnauthorizedException('Numéro ou mot de passe incorrect');
+    }
+
+    // Vérifier que le compte est actif
+    if (!driver.isActive) {
+      throw new UnauthorizedException('Votre compte est inactif. Contactez l\'administrateur.');
+    }
+
+    // Mettre à jour le statut de connexion
+    await this.deliveryPersonsService.updateOnlineStatus(driver.id, true);
+
+    console.log(`✅ Livreur ${driver.firstName} ${driver.lastName} connecté à ${new Date().toLocaleString('fr-FR')}`);
+
+    const payload = { sub: driver.id, phone: driver.phone, role: 'driver' };
+    const access_token = this.jwtService.sign(payload);
+
+    const updatedDriver = await this.deliveryPersonsService.findOne(driver.id);
+
+    return {
+      access_token,
+      driver: {
+        id: updatedDriver.id,
+        firstName: updatedDriver.firstName,
+        lastName: updatedDriver.lastName,
+        phone: updatedDriver.phone,
+        email: updatedDriver.email,
+        isOnline: updatedDriver.isOnline,
+        status: updatedDriver.status,
+      }
+    };
+  }
+
+  async logoutDriver(driverId: string): Promise<void> {
+    await this.deliveryPersonsService.updateOnlineStatus(driverId, false);
+    console.log(`✅ Livreur ${driverId} déconnecté à ${new Date().toLocaleString('fr-FR')}`);
   }
 }

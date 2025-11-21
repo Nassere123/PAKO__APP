@@ -1,7 +1,7 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, OneToMany, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
 import { ApiProperty } from '@nestjs/swagger';
 import { DeliveryPerson } from '../../delivery-persons/entities/delivery-person.entity';
-import { Order } from '../../orders/entities/order.entity';
+import { Package } from '../../packages/entities/package.entity';
 
 export enum MissionStatus {
   PENDING = 'pending',
@@ -49,10 +49,20 @@ export class Mission {
   @Column({ type: 'uuid', nullable: true })
   deliveryPersonId?: string;
 
+  @ApiProperty({ description: 'Nom du livreur assigné', required: false })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  deliveryPersonName?: string;
+
+  @ApiProperty({ description: 'ID du colis associé' })
+  @Column({ type: 'uuid' })
+  packageId: string;
+
   // Relations
   @ManyToOne(() => DeliveryPerson, deliveryPerson => deliveryPerson.missions)
   @JoinColumn({ name: 'deliveryPersonId' })
   deliveryPerson?: DeliveryPerson;
 
-  // Note: Relation supprimée car mission n'existe plus dans Order
+  @ManyToOne(() => Package)
+  @JoinColumn({ name: 'packageId' })
+  package?: Package;
 }

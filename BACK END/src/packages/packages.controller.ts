@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { PackagesService } from './packages.service';
 import { Package, PackageStatus } from './entities/package.entity';
 import { CreatePackageDto } from './dto/create-package.dto';
@@ -70,6 +70,41 @@ export class PackagesController {
   @ApiResponse({ status: 200, description: 'Statut mis à jour', type: Package })
   updateStatus(@Param('id') id: string, @Body('status') status: PackageStatus) {
     return this.packagesService.updateStatus(id, status);
+  }
+
+  @Patch('code/:packageCode/ready')
+  @ApiOperation({ summary: 'Marquer un colis comme prêt pour livraison' })
+  @ApiResponse({ status: 200, description: 'Colis marqué comme prêt', type: Package })
+  markAsReadyForDelivery(@Param('packageCode') packageCode: string) {
+    return this.packagesService.markAsReadyForDelivery(packageCode);
+  }
+
+  @Patch('code/:packageCode/assign')
+  @ApiOperation({ summary: 'Assigner un colis à un livreur' })
+  @ApiResponse({ status: 200, description: 'Colis assigné au livreur', type: Package })
+  assignToDriver(
+    @Param('packageCode') packageCode: string,
+    @Body() payload: { driverId: string; driverName?: string },
+  ) {
+    return this.packagesService.assignToDriver(packageCode, payload.driverId, payload.driverName);
+  }
+
+  @Get('driver/:driverId')
+  @ApiOperation({ summary: 'Récupérer les colis assignés à un livreur' })
+  @ApiQuery({
+    name: 'status',
+    required: false,
+    description: 'Liste de statuts séparés par des virgules',
+  })
+  @ApiResponse({ status: 200, description: 'Liste des colis assignés', type: [Package] })
+  findByDriver(
+    @Param('driverId') driverId: string,
+    @Query('status') status?: string,
+  ) {
+    const statuses = status
+      ? status.split(',').map((s) => s.trim() as PackageStatus)
+      : undefined;
+    return this.packagesService.findByDriverId(driverId, statuses);
   }
 
   @Delete(':id')

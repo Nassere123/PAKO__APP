@@ -31,12 +31,23 @@ export class DeliveryPersonsController {
     return this.deliveryPersonsService.findOne(id);
   }
 
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Récupérer un livreur par ID utilisateur' })
-  @ApiParam({ name: 'userId', description: 'ID de l\'utilisateur' })
+  @Get('phone/:phone')
+  @ApiOperation({ summary: 'Récupérer un livreur par numéro de téléphone' })
+  @ApiParam({ name: 'phone', description: 'Numéro de téléphone du livreur' })
   @ApiResponse({ status: 200, description: 'Livreur récupéré avec succès' })
-  async findByUserId(@Param('userId') userId: string): Promise<DeliveryPerson | null> {
-    return this.deliveryPersonsService.findByUserId(userId);
+  async findByPhone(@Param('phone') phone: string): Promise<DeliveryPerson | null> {
+    return this.deliveryPersonsService.findByPhone(phone);
+  }
+
+  @Put(':id/online-status')
+  @ApiOperation({ summary: 'Mettre à jour le statut de connexion d\'un livreur' })
+  @ApiParam({ name: 'id', description: 'ID du livreur' })
+  @ApiResponse({ status: 200, description: 'Statut de connexion mis à jour' })
+  async updateOnlineStatus(
+    @Param('id') id: string,
+    @Body() body: { isOnline: boolean },
+  ): Promise<DeliveryPerson> {
+    return this.deliveryPersonsService.updateOnlineStatus(id, body.isOnline);
   }
 
   @Post()

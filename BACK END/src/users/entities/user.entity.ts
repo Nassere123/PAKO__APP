@@ -8,6 +8,7 @@ import { Incident } from '../../incidents/entities/incident.entity';
 export enum UserType {
   CUSTOMER = 'customer',
   DRIVER = 'driver',
+  STATION_AGENT = 'station_agent',
   ADMIN = 'admin',
 }
 
@@ -39,10 +40,9 @@ export class User {
   @Column({ type: 'varchar', length: 255, nullable: true })
   email?: string;
 
-  // Suppression du mot de passe - authentification par OTP uniquement
-  // @ApiProperty({ description: 'Mot de passe hashé' })
-  // @Column({ type: 'varchar', length: 255 })
-  // password: string;
+  @ApiProperty({ description: 'Mot de passe hashé (pour les travailleurs uniquement)', required: false })
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  password?: string;
 
   @ApiProperty({ description: 'Type d\'utilisateur', enum: UserType })
   @Column({ type: 'enum', enum: UserType, default: UserType.CUSTOMER })
@@ -87,6 +87,18 @@ export class User {
   @ApiProperty({ description: 'Pays de l\'utilisateur', required: false })
   @Column({ type: 'varchar', length: 100, nullable: true })
   country?: string;
+
+  @ApiProperty({ description: 'Utilisateur actuellement en ligne' })
+  @Column({ type: 'boolean', default: false })
+  isOnline: boolean;
+
+  @ApiProperty({ description: 'Date de dernière connexion' })
+  @Column({ type: 'timestamp', nullable: true })
+  lastLoginAt?: Date;
+
+  @ApiProperty({ description: 'Date de dernière déconnexion' })
+  @Column({ type: 'timestamp', nullable: true })
+  lastLogoutAt?: Date;
 
   @ApiProperty({ description: 'Date de création' })
   @CreateDateColumn()

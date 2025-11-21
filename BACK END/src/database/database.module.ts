@@ -24,7 +24,7 @@ import { DatabaseController } from './database.controller';
         password: configService.get('DB_PASSWORD', 'pako_password'),
         database: configService.get('DB_NAME', 'pako_db'),
         entities: [__dirname + '/../**/*.entity{.ts,.js}'],
-        synchronize: configService.get('NODE_ENV') === 'development',
+        synchronize: false, // Temporairement désactivé pour éviter les conflits d'index
         logging: configService.get('NODE_ENV') === 'development',
         migrations: [__dirname + '/migrations/*{.ts,.js}'],
         migrationsRun: false,

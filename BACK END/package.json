@@ -22,7 +22,17 @@
     "db:seed": "ts-node src/database/seed-data.ts",
     "db:test": "ts-node src/database/test-connection.ts",
     "db:init": "ts-node src/database/init-database.ts",
-    "db:setup": "npm run db:init && npm run db:test"
+    "db:setup": "npm run db:init && npm run db:test",
+    "db:create-station-agents": "ts-node src/database/create-station-agents.ts",
+    "db:migrate-station-agents": "ts-node src/database/migrate-station-agents.ts",
+    "db:migrate-drivers": "ts-node src/database/migrate-drivers.ts",
+    "db:update-drivers-table": "ts-node src/database/update-drivers-table.ts",
+    "db:recreate-drivers-table": "ts-node src/database/recreate-drivers-table.ts",
+    "db:update-packages-table": "ts-node src/database/update-packages-table.ts",
+    "db:migrate-package-drivers": "ts-node src/database/migrate-package-driver-ids.ts",
+    "db:backfill-package-codes": "ts-node src/database/backfill-package-codes.ts",
+    "db:backfill-missions": "ts-node src/database/backfill-missions.ts",
+    "db:add-delivered-enum": "ts-node src/database/add-delivered-to-packages-enum.ts"
   },
   "keywords": [
     "nestjs",
@@ -41,13 +51,15 @@
     "@nestjs/schedule": "^6.0.1",
     "@nestjs/swagger": "^7.1.17",
     "@nestjs/typeorm": "^10.0.1",
+    "@types/uuid": "^10.0.0",
     "bcryptjs": "^2.4.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
     "pg": "^8.11.3",
     "pg-pool": "^3.10.1",
     "swagger-ui-express": "^5.0.0",
-    "typeorm": "^0.3.17"
+    "typeorm": "^0.3.17",
+    "uuid": "^13.0.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

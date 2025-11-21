@@ -50,15 +50,16 @@ async function initializeDatabase() {
     await connectionPoolService.query(`
       CREATE TABLE IF NOT EXISTS drivers (
         id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-        "userId" UUID NOT NULL REFERENCES users(id),
+        "firstName" VARCHAR(100) NOT NULL,
+        "lastName" VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) UNIQUE NOT NULL,
+        email VARCHAR(255),
+        password VARCHAR(255) NOT NULL,
         "licenseNumber" VARCHAR(50) UNIQUE NOT NULL,
         status VARCHAR(20) NOT NULL DEFAULT 'offline',
-        "vehicleType" VARCHAR(20) NOT NULL,
-        "vehicleBrand" VARCHAR(100) NOT NULL,
-        "vehicleModel" VARCHAR(100) NOT NULL,
-        "plateNumber" VARCHAR(20) UNIQUE NOT NULL,
-        "vehicleColor" VARCHAR(50) NOT NULL,
-        "maxLoadCapacity" DECIMAL(10,2) NOT NULL,
+        "isOnline" BOOLEAN NOT NULL DEFAULT false,
+        "lastLoginAt" TIMESTAMP,
+        "lastLogoutAt" TIMESTAMP,
         "currentLatitude" DECIMAL(10,8),
         "currentLongitude" DECIMAL(11,8),
         rating DECIMAL(3,2) NOT NULL DEFAULT 0,
@@ -70,6 +71,28 @@ async function initializeDatabase() {
       )
     `);
     console.log('   ✅ Table drivers créée');
+    
+    // Table station_agents
+    await connectionPoolService.query(`
+      CREATE TABLE IF NOT EXISTS station_agents (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        "firstName" VARCHAR(100) NOT NULL,
+        "lastName" VARCHAR(100) NOT NULL,
+        phone VARCHAR(20) UNIQUE NOT NULL,
+        email VARCHAR(255),
+        password VARCHAR(255) NOT NULL,
+        "stationId" VARCHAR(100) NOT NULL,
+        "stationName" VARCHAR(255) NOT NULL,
+        "isOnline" BOOLEAN NOT NULL DEFAULT false,
+        "lastLoginAt" TIMESTAMP,
+        "lastLogoutAt" TIMESTAMP,
+        "isActive" BOOLEAN NOT NULL DEFAULT true,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "deletedAt" TIMESTAMP
+      )
+    `);
+    console.log('   ✅ Table station_agents créée');
     
     // Table orders
     await connectionPoolService.query(`
@@ -133,6 +156,25 @@ async function initializeDatabase() {
     `);
     console.log('   ✅ Table packages créée');
     
+    // Table missions
+    await connectionPoolService.query(`
+      CREATE TABLE IF NOT EXISTS missions (
+        id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+        "missionNumber" VARCHAR(20) UNIQUE NOT NULL,
+        status VARCHAR(20) NOT NULL DEFAULT 'pending',
+        "packageId" UUID NOT NULL,
+        "deliveryPersonId" UUID,
+        "assignedAt" TIMESTAMP,
+        "startedAt" TIMESTAMP,
+        "completedAt" TIMESTAMP,
+        "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        "updatedAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+        CONSTRAINT "FK_missions_package" FOREIGN KEY ("packageId") REFERENCES packages(id) ON DELETE CASCADE,
+        CONSTRAINT "FK_missions_deliveryPerson" FOREIGN KEY ("deliveryPersonId") REFERENCES drivers(id) ON DELETE SET NULL
+      )
+    `);
+    console.log('   ✅ Table missions créée');
+    
     // Table stations
     await connectionPoolService.query(`
       CREATE TABLE IF NOT EXISTS stations (
@@ -184,11 +226,17 @@ async function createIndexes(connectionPoolService: ConnectionPoolService) {
     'CREATE INDEX IF NOT EXISTS "IDX_users_status" ON users (status)',
     
     // Index pour drivers
-    'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_drivers_userId" ON drivers ("userId") WHERE "deletedAt" IS NULL',
+    'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_drivers_phone" ON drivers (phone) WHERE "deletedAt" IS NULL',
     'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_drivers_licenseNumber" ON drivers ("licenseNumber") WHERE "deletedAt" IS NULL',
-    'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_drivers_plateNumber" ON drivers ("plateNumber") WHERE "deletedAt" IS NULL',
     'CREATE INDEX IF NOT EXISTS "IDX_drivers_status" ON drivers (status)',
-    'CREATE INDEX IF NOT EXISTS "IDX_drivers_available" ON drivers (status, "isActive") WHERE status = \'available\' AND "isActive" = true',
+    'CREATE INDEX IF NOT EXISTS "IDX_drivers_isOnline" ON drivers ("isOnline")',
+    'CREATE INDEX IF NOT EXISTS "IDX_drivers_available" ON drivers ("isOnline", "isActive") WHERE "isOnline" = true AND "isActive" = true',
+    
+    // Index pour station_agents
+    'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_station_agents_phone" ON station_agents (phone) WHERE "deletedAt" IS NULL',
+    'CREATE INDEX IF NOT EXISTS "IDX_station_agents_stationId" ON station_agents ("stationId")',
+    'CREATE INDEX IF NOT EXISTS "IDX_station_agents_isOnline" ON station_agents ("isOnline")',
+    'CREATE INDEX IF NOT EXISTS "IDX_station_agents_isActive" ON station_agents ("isActive")',
     
     // Index pour orders
     'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_orders_orderNumber" ON orders ("orderNumber") WHERE "deletedAt" IS NULL',
@@ -202,6 +250,13 @@ async function createIndexes(connectionPoolService: ConnectionPoolService) {
     'CREATE INDEX IF NOT EXISTS "IDX_packages_orderId" ON packages ("orderId")',
     'CREATE INDEX IF NOT EXISTS "IDX_packages_type" ON packages (type)',
     'CREATE INDEX IF NOT EXISTS "IDX_packages_status" ON packages (status)',
+    
+    // Index pour missions
+    'CREATE UNIQUE INDEX IF NOT EXISTS "IDX_missions_missionNumber" ON missions ("missionNumber")',
+    'CREATE INDEX IF NOT EXISTS "IDX_missions_packageId" ON missions ("packageId")',
+    'CREATE INDEX IF NOT EXISTS "IDX_missions_deliveryPersonId" ON missions ("deliveryPersonId") WHERE "deliveryPersonId" IS NOT NULL',
+    'CREATE INDEX IF NOT EXISTS "IDX_missions_status" ON missions (status)',
+    'CREATE INDEX IF NOT EXISTS "IDX_missions_assignedAt" ON missions ("assignedAt") WHERE "assignedAt" IS NOT NULL',
     
     // Index pour stations
     'CREATE INDEX IF NOT EXISTS "IDX_stations_type" ON stations (type)',
